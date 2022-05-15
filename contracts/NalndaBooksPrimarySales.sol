@@ -2,33 +2,25 @@
 pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./NalndaBookCover.sol";
+import "./NalndaBook.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
 contract NalndaBooksPrimarySales is Ownable {
     IERC20 public immutable NALNDA;
-    uint256 public commissionPercent; //primarySalesCommission percentage for primary sale/lazy minting
-
-    uint256 public totalBooks;
-    //book to author
-    mapping(address => address) public bookToAuthor;
+    uint256 public immutable commissionPercent; //primarySalesCommission percentage for primary sale/lazy minting
+    address[] public bookAddresses;
     mapping(address => address[]) public authorToBooks;
+    uint256 public totalBooksCreated;
 
-    constructor(address _NALNDA, uint256 _initialCommissionPercent) {
+    constructor(address _NALNDA) {
         require(
             _NALNDA != address(0),
             "NalndaPrimarySales: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        commissionPercent = _initialCommissionPercent;
-        totalBooks = 0;
-    }
-
-    function changeCommissionPercent(uint256 _newCommissionPercent)
-        external
-        onlyOwner
-    {
-        commissionPercent = _newCommissionPercent;
+        //fixing commision percent to 5% for now
+        commissionPercent = 5;
+        totalBooksCreated = 0;
     }
 
     function createNewBook(
@@ -44,11 +36,28 @@ contract NalndaBooksPrimarySales is Ownable {
             bytes(_coverURI).length > 0,
             "NalndaPrimarySales: Empty string passed as cover URI!!!"
         );
-        address bookAddress = address(
-            new NalndaBookCover(_author, _coverURI, _initialPrice)
+        address _addressOutput = address(
+            new NalndaBook(_author, _coverURI, _initialPrice)
         );
-        bookToAuthor[bookAddress] = _author;
-        authorToBooks[_msgSender()].push(bookAddress);
-        totalBooks++;
+        bookAddresses.push(_addressOutput);
+        authorToBooks[_msgSender()].push(_addressOutput);
+        totalBooksCreated++;
+    }
+
+    function bookToAuthor(address _book) public view returns (address author) {
+        author = Ownable(_book).owner();
+    }
+
+    function withdrawCommissions() external onlyOwner {
+        uint256 balance = NALNDA.balanceOf(address(this));
+        require(balance != 0, "NalndaPrimarySales: Nothing to withdraw!");
+        NALNDA.transfer(owner(), balance);
+    }
+
+    function withdrawAnyETH() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance != 0, "NalndaPrimarySales: Nothing to withdraw!");
+        (bool success, ) = payable(owner()).call{value: balance}("");
+        require(success, "ETH transfer failed!!!");
     }
 }

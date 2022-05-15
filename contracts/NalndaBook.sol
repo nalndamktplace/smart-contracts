@@ -2,35 +2,31 @@
 pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaBooksPrimarySales.sol";
 
-contract NalndaBookCover is ERC721, Pausable, ERC721Burnable {
+contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
 
-    Counters.Counter private _tokenIdCounter;
+    Counters.Counter private _coverIdCounter;
     IERC20 public immutable NALNDA;
     INalndaBooksPrimarySales public immutable primarySalesContract;
     uint256 public immutable commissionPercent;
-    address public immutable author;
     string private uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
     uint256 public totalCommisionsPaidOut;
 
-    modifier onlyAuthor() {
-        require(_msgSender() == author, "Not author!!!");
-        _;
-    }
-
     constructor(
         address _author,
         string memory _uri,
         uint256 _initialPrice
-    ) ERC721("NalndaBookCover", "NBCVR") {
+    ) ERC721("NalndaBookCover", "COVER") {
         require(
             _author != address(0),
             "NalndaBookCover: Author's address can't be null!"
@@ -39,15 +35,19 @@ contract NalndaBookCover is ERC721, Pausable, ERC721Burnable {
             bytes(_uri).length > 0,
             "NalndaBookCover: Empty string passed as cover URI!!!"
         );
+        require(
+            Address.isContract(_msgSender()) == true,
+            "NalndaBookCover: Primary sales address is not a contract!!!"
+        );
         primarySalesContract = INalndaBooksPrimarySales(_msgSender());
-        author = _author;
+        transferOwnership(_author);
         commissionPercent = primarySalesContract.commissionPercent();
         NALNDA = IERC20(primarySalesContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
     }
 
-    function changeMintPrice(uint256 _newPrice) external onlyAuthor {
+    function changeMintPrice(uint256 _newPrice) external onlyOwner {
         mintPrice = _newPrice;
     }
 
@@ -65,18 +65,18 @@ contract NalndaBookCover is ERC721, Pausable, ERC721Burnable {
         return uri;
     }
 
-    function pause() public onlyAuthor {
+    function pause() public onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyAuthor {
+    function unpause() public onlyOwner {
         _unpause();
     }
 
     //owner should be able to mint for free at any point
-    function ownerMint(address to) external onlyAuthor {
-        _tokenIdCounter.increment();
-        uint256 tokenId = _tokenIdCounter.current();
+    function ownerMint(address to) external onlyOwner {
+        _coverIdCounter.increment();
+        uint256 tokenId = _coverIdCounter.current();
         _safeMint(to, tokenId);
     }
 
@@ -84,13 +84,20 @@ contract NalndaBookCover is ERC721, Pausable, ERC721Burnable {
     function safeMint(address to) external {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
-
+        //send commision to primarySalesContract
+        uint256 commisionPayout = (mintPrice * commissionPercent) / 100;
+        totalCommisionsPaidOut += commisionPayout;
+        NALNDA.transfer(address(primarySalesContract), commisionPayout);
+        //send author's share to the author
+        uint256 authorShare = mintPrice - commisionPayout;
+        authorEarningsPaidout += authorShare;
+        NALNDA.transfer(owner(), authorShare);
         // totalEarningsPayout += mintPrice;
-        _tokenIdCounter.increment();
-        uint256 tokenId = _tokenIdCounter.current();
+        _coverIdCounter.increment();
+        uint256 tokenId = _coverIdCounter.current();
         //first mint for author then transfer to buyer
-        _safeMint(author, tokenId);
-        _transfer(author, to, tokenId);
+        _safeMint(owner(), tokenId);
+        _transfer(owner(), to, tokenId);
     }
 
     function _beforeTokenTransfer(
