@@ -1,14 +1,11 @@
 const hre = require("hardhat");
+require("dotenv").config();
 
 async function main() {
-    //deploy test nalnda token
-    const Nalnda = await hre.ethers.getContractFactory("Nalnda");
-    const nalnda = await Nalnda.deploy();
-    await nalnda.deployed();
-    console.log("Nalnda ERC20 deployed to:", nalnda.address);
+    console.log("Using Nalnda ERC20 deployed to:", process.env.NALNDA_ERC20);
     //deploy NalndaBooksPrimarySales
     const NalndaBooksPrimarySales = await hre.ethers.getContractFactory("NalndaBooksPrimarySales");
-    const primarySales = await NalndaBooksPrimarySales.deploy(nalnda.address);
+    const primarySales = await NalndaBooksPrimarySales.deploy(process.env.NALNDA_ERC20);
     await primarySales.deployed();
     console.log("NalndaBooksPrimarySales deployed to:", primarySales.address);
 }

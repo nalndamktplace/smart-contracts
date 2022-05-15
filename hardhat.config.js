@@ -29,6 +29,10 @@ module.exports = {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`${process.env.PRIVATE_KEY}`],
     },
+    mumbai: {
+      url: `https://matic-mumbai.chainstacklabs.com`,
+      accounts: [`${process.env.PRIVATE_KEY}`],
+    },
     hardhat: {
       gas: 12000000,
       blockGasLimit: 0x1fffffffffffff,
