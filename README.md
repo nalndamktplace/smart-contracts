@@ -1,5 +1,7 @@
 # Smart contracts for Nalnda Marketplace
 
+Mint test Nalnda tokens using: https://mint-nalnda.netlify.app/
+
 Hardhat commands:
 
 ```shell
