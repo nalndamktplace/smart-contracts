@@ -34,7 +34,7 @@ contract NalndaBooksPrimarySales is Ownable {
         );
         require(
             bytes(_coverURI).length > 0,
-            "NalndaPrimarySales: Empty string passed as cover URI!!!"
+            "NalndaPrimarySales: Empty string passed as cover URI!"
         );
         address _addressOutput = address(
             new NalndaBook(_author, _coverURI, _initialPrice)
@@ -52,12 +52,5 @@ contract NalndaBooksPrimarySales is Ownable {
         uint256 balance = NALNDA.balanceOf(address(this));
         require(balance != 0, "NalndaPrimarySales: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
-    }
-
-    function withdrawAnyETH() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance != 0, "NalndaPrimarySales: Nothing to withdraw!");
-        (bool success, ) = payable(owner()).call{value: balance}("");
-        require(success, "ETH transfer failed!!!");
     }
 }
