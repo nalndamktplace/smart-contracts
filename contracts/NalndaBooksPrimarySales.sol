@@ -30,7 +30,7 @@ contract NalndaBooksPrimarySales is Ownable {
     ) external {
         require(
             _author != address(0),
-            "NalndaBooksPrimarySales: Author's address can't be null!"
+            "NalndaBooksPrimarySales: Author address can't be null!"
         );
         require(
             bytes(_coverURI).length > 0,

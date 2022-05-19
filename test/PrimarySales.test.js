@@ -17,10 +17,10 @@ describe("NalndaBooksPrimarySales tests", function () {
         console.log("done...");
     })
     it("createNewBook(): should revert if address of the author passed is null", async function () {
-        await expect(primarySale.createNewBook(ZERO_ADDR, "test_uri", ethers.utils.parseEther("1"))).to.revertedWith("NalndaPrimarySales: Author's address can't be null!");
+        await expect(primarySale.createNewBook(ZERO_ADDR, "test_uri", ethers.utils.parseEther("1"))).to.revertedWith("NalndaBooksPrimarySales: Author address can't be null!");
     });
     it("createNewBook(): should revert if cover uri passed is empty", async () => {
-        await expect(primarySale.createNewBook(accounts[0].address, "", ethers.utils.parseEther("1"))).to.revertedWith("NalndaPrimarySales: Empty string passed as cover URI!");
+        await expect(primarySale.createNewBook(accounts[0].address, "", ethers.utils.parseEther("1"))).to.revertedWith("NalndaBooksPrimarySales: Empty string passed as cover URI!");
     })
     let newBook;
     it("createNewBook(): should be able to create a new book, with covers prices at 100 NALNDA", async () => {
