@@ -13,11 +13,11 @@ import "./interfaces/INalndaBooksPrimarySales.sol";
 contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
 
-    Counters.Counter private _coverIdCounter;
+    Counters.Counter public coverIdCounter;
     IERC20 public immutable NALNDA;
     INalndaBooksPrimarySales public immutable primarySalesContract;
     uint256 public immutable commissionPercent;
-    string private uri;
+    string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
     uint256 public totalCommisionsPaidOut;
@@ -29,15 +29,15 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     ) ERC721("NalndaBookCover", "COVER") {
         require(
             _author != address(0),
-            "NalndaBookCover: Author's address can't be null!"
+            "NalndaBook: Author's address can't be null!"
         );
         require(
             bytes(_uri).length > 0,
-            "NalndaBookCover: Empty string passed as cover URI!!!"
+            "NalndaBook: Empty string passed as cover URI!!!"
         );
         require(
             Address.isContract(_msgSender()) == true,
-            "NalndaBookCover: Primary sales address is not a contract!!!"
+            "NalndaBook: Primary sales address is not a contract!!!"
         );
         primarySalesContract = INalndaBooksPrimarySales(_msgSender());
         transferOwnership(_author);
@@ -75,8 +75,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     //owner should be able to mint for free at any point
     function ownerMint(address to) external onlyOwner {
-        _coverIdCounter.increment();
-        uint256 tokenId = _coverIdCounter.current();
+        coverIdCounter.increment();
+        uint256 tokenId = coverIdCounter.current();
         _safeMint(to, tokenId);
     }
 
@@ -93,8 +93,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         authorEarningsPaidout += authorShare;
         NALNDA.transfer(owner(), authorShare);
         // totalEarningsPayout += mintPrice;
-        _coverIdCounter.increment();
-        uint256 tokenId = _coverIdCounter.current();
+        coverIdCounter.increment();
+        uint256 tokenId = coverIdCounter.current();
         //first mint for author then transfer to buyer
         _safeMint(owner(), tokenId);
         _transfer(owner(), to, tokenId);

@@ -15,7 +15,7 @@ contract NalndaBooksPrimarySales is Ownable {
     constructor(address _NALNDA) {
         require(
             _NALNDA != address(0),
-            "NalndaPrimarySales: NALNDA token's address can't be null!"
+            "NalndaBooksPrimarySales: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
         //fixing commision percent to 5% for now
@@ -30,11 +30,11 @@ contract NalndaBooksPrimarySales is Ownable {
     ) external {
         require(
             _author != address(0),
-            "NalndaPrimarySales: Author's address can't be null!"
+            "NalndaBooksPrimarySales: Author's address can't be null!"
         );
         require(
             bytes(_coverURI).length > 0,
-            "NalndaPrimarySales: Empty string passed as cover URI!"
+            "NalndaBooksPrimarySales: Empty string passed as cover URI!"
         );
         address _addressOutput = address(
             new NalndaBook(_author, _coverURI, _initialPrice)
@@ -50,7 +50,7 @@ contract NalndaBooksPrimarySales is Ownable {
 
     function withdrawCommissions() external onlyOwner {
         uint256 balance = NALNDA.balanceOf(address(this));
-        require(balance != 0, "NalndaPrimarySales: Nothing to withdraw!");
+        require(balance != 0, "NalndaBooksPrimarySales: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
     }
 }
