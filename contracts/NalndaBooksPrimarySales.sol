@@ -12,6 +12,16 @@ contract NalndaBooksPrimarySales is Ownable {
     mapping(address => address[]) public authorToBooks;
     uint256 public totalBooksCreated;
 
+    //Events
+    event NewBookCreated(
+        address indexed _author,
+        address _bookAddress,
+        string _coverURI,
+        uint256 _price
+    );
+
+    event EtherWithdrawn(uint256 _ethWithdrawn);
+
     constructor(address _NALNDA) {
         require(
             _NALNDA != address(0),
@@ -42,6 +52,7 @@ contract NalndaBooksPrimarySales is Ownable {
         bookAddresses.push(_addressOutput);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
+        emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice);
     }
 
     function bookToAuthor(address _book) public view returns (address author) {
@@ -52,5 +63,6 @@ contract NalndaBooksPrimarySales is Ownable {
         uint256 balance = NALNDA.balanceOf(address(this));
         require(balance != 0, "NalndaBooksPrimarySales: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
+        emit EtherWithdrawn(balance);
     }
 }
