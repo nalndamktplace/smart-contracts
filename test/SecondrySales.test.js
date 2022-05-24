@@ -68,9 +68,9 @@ describe("NalndaBooksSecondarySales tests", function () {
     it("buyCover(): should revert if order id is invalid", async () => {
         await expect(secondarySale.buyCover(BigNumber.from("2"))).to.revertedWith("NalndaBooksSecondarySales: Invalid order id!")
     })
-    let theCover;
+    let theCover, buyer;
     it("buyCover(): should buyer should be able to buy a listed cover", async () => {
-        const buyer = accounts[4];
+        buyer = accounts[4];
         //mint some NALNDA
         try {
             await nalnda_erc20.connect(buyer).mint(ethers.utils.parseEther("1000"));
@@ -88,22 +88,63 @@ describe("NalndaBooksSecondarySales tests", function () {
         const newBuyer = accounts[5];
         await expect(secondarySale.connect(newBuyer).buyCover(BigNumber.from("1"))).to.revertedWith("NalndaBooksSecondarySales: NFT not yet listed / already sold!")
     })
-    it("testing for author's share (10%)", async () => {
+    it("buyCover(): testing for author's share (10%)", async () => {
         // 10% of sale price
         const expected = (ethers.utils.parseEther("200").mul(BigNumber.from("10"))).div(BigNumber.from("100"));
         let bal = await nalnda_erc20.balanceOf(await primarySale.bookToAuthor(newBook));
         expect(expected).to.equal(bal.sub(ethers.utils.parseEther("95"))); //subtracting revenue from selling first book 95% of 100 NALNDA
     })
-    it("testing for protocol fee (2%)", async () => {
+    it("buyCover(): testing for protocol fee (2%)", async () => {
         // 2% of sale price
         const expected = (ethers.utils.parseEther("200").mul(BigNumber.from("2"))).div(BigNumber.from("100"));
         expect(expected).to.equal(await nalnda_erc20.balanceOf(secondarySale.address));
     })
-    it("testing for sellers share (88%)", async () => {
+    it("buyCover(): testing for sellers share (88%)", async () => {
         //remaining = 88% = 100% - 10% - 2%
         const expected = (ethers.utils.parseEther("200").mul(BigNumber.from("88"))).div(BigNumber.from("100"));
         let bal = await nalnda_erc20.balanceOf(lister.address);
         expect(expected).to.equal(bal.sub(extraBal)); //subtracting extra NALNDA from the calculations
+    })
+    it("unlistCover(): should revert if invalid order id is provided", async () => {
+        await expect(secondarySale.unlistCover(BigNumber.from("2"))).to.revertedWith("NalndaBooksSecondarySales: Invalid order id!")
+    })
+    it("unlistCover(): should revert if order not in LISTED stage", async () => {
+        await expect(secondarySale.unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaBooksSecondarySales: NFT not yet listed / already sold!")
+    })
+    let newLister;
+    it("unlistCover(): should revert if anyone other than seller tries to unlist", async () => {
+        //listing new book
+        const NalndaBook = await ethers.getContractFactory("NalndaBook");
+        nalnda_book = await NalndaBook.attach(newBook);
+        newLister = buyer; //old buyer
+        try {
+            //list for sale for 200 NALNDA
+            await nalnda_book.connect(newLister).setApprovalForAll(secondarySale.address, true);
+            await secondarySale.connect(newLister).listCover(newBook, BigNumber.from("1"), ethers.utils.parseEther("200"))
+        } catch (err) {
+            console.log(err);
+        }
+        expect(await secondarySale.lastId()).to.equal(BigNumber.from("2"));
+        //testing the test case
+        await expect(secondarySale.connect(accounts[7]).unlistCover(BigNumber.from("2"))).to.revertedWith("NalndaBooksSecondarySales: Only seller can unlist!")
+    })
+    it("unlistCover(): seller should be able to unlist its cover", async () => {
+        const balBef = await nalnda_book.balanceOf(newLister.address);
+        try {
+            await secondarySale.connect(newLister).unlistCover(BigNumber.from("2"));
+        } catch (err) {
+            console.log(err);
+        }
+        const balAft = await nalnda_book.balanceOf(newLister.address);
+        expect(balAft).to.above(balBef);
+        expect(balAft).to.equal(BigNumber.from("1"))
+    })
+    it("unlistCover(): should revert if seller tries to unlist again", async () => {
+        await expect(secondarySale.connect(newLister).unlistCover(BigNumber.from("2"))).to.revertedWith("NalndaBooksSecondarySales: NFT not yet listed / already sold!")
+    })
+    it("unlistCover(): should update the stage of the order correctly", async () => {
+        let newOrder = await secondarySale.ORDER(BigNumber.from("2"));
+        expect(newOrder.stage).to.equal(BigNumber.from("0"));
     })
     it("withdrawRevenue(): should revery in case some other account than the owner calls it", async () => {
         await expect(secondarySale.connect(accounts[6]).withdrawRevenue()).to.revertedWith("Ownable: caller is not the owner")

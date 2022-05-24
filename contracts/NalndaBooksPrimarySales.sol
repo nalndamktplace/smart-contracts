@@ -20,7 +20,7 @@ contract NalndaBooksPrimarySales is Ownable {
         uint256 _price
     );
 
-    event EtherWithdrawn(uint256 _ethWithdrawn);
+    event RevenueWithdrawn(uint256 _revenueWithdrawn);
 
     constructor(address _NALNDA) {
         require(
@@ -63,6 +63,6 @@ contract NalndaBooksPrimarySales is Ownable {
         uint256 balance = NALNDA.balanceOf(address(this));
         require(balance != 0, "NalndaBooksPrimarySales: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
-        emit EtherWithdrawn(balance);
+        emit RevenueWithdrawn(balance);
     }
 }

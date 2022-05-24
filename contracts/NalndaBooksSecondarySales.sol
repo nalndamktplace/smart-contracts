@@ -14,7 +14,7 @@ contract NalndaBooksSecondarySales is Ownable {
     uint256 public lastId;
 
     enum Stage {
-        NOT_LISTED,
+        UNLISTED,
         LISTED,
         SOLD
     }
@@ -30,6 +30,30 @@ contract NalndaBooksSecondarySales is Ownable {
 
     //orderId => Order
     mapping(uint256 => Order) public ORDER;
+
+    //events
+    event CoverListed(
+        uint256 indexed _orderId,
+        address _lister,
+        address indexed _book,
+        uint256 indexed _tokenId,
+        uint256 _price
+    );
+
+    event CoverUnlisted(
+        uint256 indexed _orderId,
+        address indexed _book,
+        uint256 indexed _tokenId
+    );
+    event CoverBought(
+        uint256 indexed _orderId,
+        address indexed _book,
+        uint256 indexed _tokenId,
+        address _buyer,
+        uint256 _price
+    );
+
+    event RevenueWithdrawn(uint256 _revenueWithdrawn);
 
     constructor(address _NALNDA) {
         require(
@@ -69,6 +93,41 @@ contract NalndaBooksSecondarySales is Ownable {
             _tokenId,
             _price
         );
+        emit CoverListed(
+            lastId,
+            _msgSender(),
+            address(_book),
+            _tokenId,
+            _price
+        );
+    }
+
+    function unlistCover(uint256 _orderId) external {
+        require(
+            _orderId <= lastId,
+            "NalndaBooksSecondarySales: Invalid order id!"
+        );
+        Order memory orderCache = ORDER[_orderId];
+        require(
+            orderCache.stage == Stage.LISTED,
+            "NalndaBooksSecondarySales: NFT not yet listed / already sold!"
+        );
+        require(
+            _msgSender() == orderCache.seller,
+            "NalndaBooksSecondarySales: Only seller can unlist!"
+        );
+        ORDER[_orderId].stage = Stage.UNLISTED; //to prevent reentrancy
+        //return the seller its cover
+        orderCache.book.safeTransferFrom(
+            address(this),
+            orderCache.seller,
+            orderCache.tokenId
+        );
+        emit CoverUnlisted(
+            orderCache.orderId,
+            address(orderCache.book),
+            orderCache.tokenId
+        );
     }
 
     function buyCover(uint256 _orderId) external {
@@ -76,11 +135,11 @@ contract NalndaBooksSecondarySales is Ownable {
             _orderId <= lastId,
             "NalndaBooksSecondarySales: Invalid order id!"
         );
+        Order memory orderCache = ORDER[_orderId];
         require(
-            ORDER[_orderId].stage == Stage.LISTED,
+            orderCache.stage == Stage.LISTED,
             "NalndaBooksSecondarySales: NFT not yet listed / already sold!"
         );
-        Order memory orderCache = ORDER[_orderId];
         ORDER[_orderId].stage = Stage.SOLD; //to prevent reentrancy
         NALNDA.transferFrom(_msgSender(), address(this), orderCache.price);
         //send author commision
@@ -96,6 +155,13 @@ contract NalndaBooksSecondarySales is Ownable {
             _msgSender(),
             orderCache.tokenId
         );
+        emit CoverBought(
+            orderCache.orderId,
+            address(orderCache.book),
+            orderCache.tokenId,
+            _msgSender(),
+            orderCache.price
+        );
     }
 
     function withdrawRevenue() external onlyOwner {
@@ -105,5 +171,6 @@ contract NalndaBooksSecondarySales is Ownable {
             "NalndaBooksSecondarySales: Nothing to withdraw!"
         );
         NALNDA.transfer(owner(), balance);
+        emit RevenueWithdrawn(balance);
     }
 }
