@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 
-interface INalndaBooksPrimarySales {
+interface INalndaMarketplace {
     function NALNDA() external view returns (address);
 
-    function commissionPercent() external view returns (uint256);
+    function protocolMintFee() external view returns (uint256);
 
     function createNewBook(
         address _author,

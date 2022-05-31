@@ -5,9 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./NalndaBook.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
-contract NalndaBooksPrimarySales is Ownable {
+contract NalndaMarketplace is Ownable {
     IERC20 public immutable NALNDA;
-    uint256 public immutable commissionPercent; //primarySalesCommission percentage for primary sale/lazy minting
+    uint256 public immutable protocolMintFee; //primarySalesCommission percentage for primary sale/lazy minting
     address[] public bookAddresses;
     mapping(address => address[]) public authorToBooks;
     uint256 public totalBooksCreated;
@@ -28,8 +28,8 @@ contract NalndaBooksPrimarySales is Ownable {
             "NalndaBooksPrimarySales: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        //fixing commision percent to 5% for now
-        commissionPercent = 5;
+        //fixing commision percent to 10%
+        protocolMintFee = 10;
         totalBooksCreated = 0;
     }
 
