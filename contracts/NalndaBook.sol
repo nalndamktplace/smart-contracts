@@ -128,11 +128,11 @@ contract NalndaBook is ERC721, Pausable, Ownable {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
         );
-        _chargeTransferFee(tokenId);
+        _chargeTransferFees(tokenId);
         _safeTransfer(from, to, tokenId, data);
     }
 
-    function _chargeTransferFee(uint256 tokenId) internal {
+    function _chargeTransferFees(uint256 tokenId) internal {
         uint256 lastSellPrice = lastSoldPrice[tokenId];
         //charging transfer fee
         uint256 totalFee = (lastSellPrice * (bookOwnerShare + protocolFee)) /
@@ -141,6 +141,9 @@ contract NalndaBook is ERC721, Pausable, Ownable {
         //send owner share to the book owner
         uint256 ownerShare = (lastSellPrice * bookOwnerShare) / 100;
         NALNDA.transfer(owner(), ownerShare);
+        //send protocol its share
+        uint256 protocolShare = (lastSellPrice * protocolFee) / 100;
+        NALNDA.transfer(address(marketplaceContract), protocolShare);
     }
 
     function transferFrom(
@@ -153,7 +156,7 @@ contract NalndaBook is ERC721, Pausable, Ownable {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
         );
-        _chargeTransferFee(tokenId);
+        _chargeTransferFees(tokenId);
         _transfer(from, to, tokenId);
     }
 
