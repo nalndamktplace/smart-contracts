@@ -23,6 +23,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256 public immutable bookOwnerShare;
     uint256 public immutable creationTimestamp;
     uint256 public immutable secondarySalesTimestamp;
+    uint256 public immutable bookLang;
+    uint256 public immutable bookGenre;
     string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
@@ -43,7 +45,9 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         string memory _uri,
         uint256 _initialPrice,
         uint256 _minPrimarySales,
-        uint256 _daysForSecondarySales
+        uint256 _daysForSecondarySales,
+        uint256 _lang,
+        uint256 _genre
     ) ERC721("NalndaBookCover", "COVER") {
         require(
             _author != address(0),
@@ -61,7 +65,17 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
             _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
             "NalndaBook: Days to secondary sales should be between 90 and 150!"
         );
+        require(
+            _lang > 0 && _lang <= 100,
+            "NalndaBook: Book language tag should be between 1 and 100!"
+        );
+        require(
+            _genre > 0 && _genre <= 60,
+            "NalndaBook: Book genre tag should be between 1 and 60!"
+        );
         creationTimestamp = block.timestamp;
+        bookLang = _lang;
+        bookGenre = _genre;
         secondarySalesTimestamp = _daysForSecondarySales * 1 days;
         marketplaceContract = INalndaMarketplace(_msgSender());
         transferOwnership(_author);
