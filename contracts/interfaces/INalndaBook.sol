@@ -15,4 +15,12 @@ interface INalndaBook is IERC721 {
         address to,
         uint256 tokenId
     ) external;
+
+    function creationTimestamp() external view returns (uint256);
+
+    function secondarySalesTimestamp() external view returns (uint256);
+
+    function ownedAt(uint256 _tokenId) external view returns (uint256);
+
+    function lastSoldPrice(uint256 _tokenId) external view returns (uint256);
 }

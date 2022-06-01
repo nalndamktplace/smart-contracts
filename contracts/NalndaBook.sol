@@ -5,14 +5,14 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-// import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaMarketplace.sol";
 
 //renownce ownership discussion
 
-contract NalndaBook is ERC721, Pausable, Ownable {
+contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
 
     Counters.Counter public coverIdCounter;
@@ -21,17 +21,29 @@ contract NalndaBook is ERC721, Pausable, Ownable {
     uint256 public immutable protocolMintFee;
     uint256 public immutable protocolFee;
     uint256 public immutable bookOwnerShare;
+    uint256 public immutable creationTimestamp;
+    uint256 public immutable secondarySalesTimestamp;
     string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
     uint256 public totalCommisionsPaidOut;
+    uint256 public minPrimarySales;
     // token id => last sale price
     mapping(uint256 => uint256) lastSoldPrice;
+    //token id => timestamp of last transfer
+    mapping(uint256 => uint256) ownedAt;
+
+    modifier onlyMarketplace() {
+        require(_msgSender() == address(marketplaceContract));
+        _;
+    }
 
     constructor(
         address _author,
         string memory _uri,
-        uint256 _initialPrice
+        uint256 _initialPrice,
+        uint256 _minPrimarySales,
+        uint256 _daysForSecondarySales
     ) ERC721("NalndaBookCover", "COVER") {
         require(
             _author != address(0),
@@ -45,6 +57,12 @@ contract NalndaBook is ERC721, Pausable, Ownable {
             Address.isContract(_msgSender()) == true,
             "NalndaBook: Primary sales address is not a contract!!!"
         );
+        require(
+            _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
+            "NalndaBook: Days to secondary sales should be between 90 and 150!"
+        );
+        creationTimestamp = block.timestamp;
+        secondarySalesTimestamp = _daysForSecondarySales * 1 days;
         marketplaceContract = INalndaMarketplace(_msgSender());
         transferOwnership(_author);
         protocolMintFee = marketplaceContract.protocolMintFee();
@@ -53,6 +71,7 @@ contract NalndaBook is ERC721, Pausable, Ownable {
         NALNDA = IERC20(marketplaceContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
+        minPrimarySales = _minPrimarySales;
     }
 
     function changeMintPrice(uint256 _newPrice) external onlyOwner {
@@ -85,7 +104,12 @@ contract NalndaBook is ERC721, Pausable, Ownable {
     function ownerMint(address to) external onlyOwner {
         coverIdCounter.increment();
         uint256 tokenId = coverIdCounter.current();
-        _safeMint(to, tokenId);
+        ownedAt[tokenId] = block.timestamp;
+        if (to != owner()) {
+            //first mint for author then transfer
+            _safeMint(owner(), tokenId);
+            _transfer(owner(), to, tokenId);
+        } else _safeMint(owner(), tokenId);
     }
 
     //public method for minting new cover
@@ -104,6 +128,7 @@ contract NalndaBook is ERC721, Pausable, Ownable {
         coverIdCounter.increment();
         uint256 _tokenId = coverIdCounter.current();
         lastSoldPrice[_tokenId] = mintPrice;
+        ownedAt[_tokenId] = block.timestamp;
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
@@ -129,6 +154,7 @@ contract NalndaBook is ERC721, Pausable, Ownable {
             "ERC721: caller is not token owner nor approved"
         );
         _chargeTransferFees(tokenId);
+        ownedAt[tokenId] = block.timestamp;
         _safeTransfer(from, to, tokenId, data);
     }
 
@@ -157,12 +183,17 @@ contract NalndaBook is ERC721, Pausable, Ownable {
             "ERC721: caller is not token owner nor approved"
         );
         _chargeTransferFees(tokenId);
+        ownedAt[tokenId] = block.timestamp;
         _transfer(from, to, tokenId);
     }
 
-    modifier onlyMarketplace() {
-        require(_msgSender() == address(marketplaceContract));
-        _;
+    function marketplaceTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) external onlyMarketplace {
+        ownedAt[_tokenId] = block.timestamp;
+        _transfer(_from, _to, _tokenId);
     }
 
     function updateLastSoldPrice(uint256 _tokenId, uint256 _price)
@@ -172,11 +203,14 @@ contract NalndaBook is ERC721, Pausable, Ownable {
         lastSoldPrice[_tokenId] = _price;
     }
 
-    function marketplaceTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external onlyMarketplace {
-        _transfer(from, to, tokenId);
+    function burn(uint256 tokenId) public virtual override {
+        //solhint-disable-next-line max-line-length
+        require(
+            _isApprovedOrOwner(_msgSender(), tokenId),
+            "ERC721: caller is not token owner nor approved"
+        );
+        lastSoldPrice[tokenId] = 0;
+        ownedAt[tokenId] = 0;
+        _burn(tokenId);
     }
 }
