@@ -195,5 +195,10 @@ contract NalndaMarketplace is Ownable {
             _msgSender(),
             orderCache.tokenId
         );
+        //update last sold price
+        orderCache.book.updateLastSoldPrice(
+            orderCache.tokenId,
+            orderCache.price
+        );
     }
 }

@@ -31,9 +31,9 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256 public totalCommisionsPaidOut;
     uint256 public minPrimarySales;
     // token id => last sale price
-    mapping(uint256 => uint256) lastSoldPrice;
+    mapping(uint256 => uint256) public lastSoldPrice;
     //token id => timestamp of last transfer
-    mapping(uint256 => uint256) ownedAt;
+    mapping(uint256 => uint256) public ownedAt;
 
     modifier onlyMarketplace() {
         require(_msgSender() == address(marketplaceContract));
@@ -76,7 +76,10 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         creationTimestamp = block.timestamp;
         bookLang = _lang;
         bookGenre = _genre;
-        secondarySalesTimestamp = _daysForSecondarySales * 1 days;
+        secondarySalesTimestamp =
+            block.timestamp +
+            _daysForSecondarySales *
+            1 days;
         marketplaceContract = INalndaMarketplace(_msgSender());
         transferOwnership(_author);
         protocolMintFee = marketplaceContract.protocolMintFee();
