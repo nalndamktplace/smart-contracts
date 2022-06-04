@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -29,7 +29,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
     uint256 public totalCommisionsPaidOut;
-    uint256 public minPrimarySales;
+
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
     //token id => timestamp of last transfer
@@ -44,7 +44,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address _author,
         string memory _uri,
         uint256 _initialPrice,
-        uint256 _minPrimarySales,
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256 _genre
@@ -88,7 +87,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         NALNDA = IERC20(marketplaceContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
-        minPrimarySales = _minPrimarySales;
     }
 
     function changeMintPrice(uint256 _newPrice) external onlyOwner {
@@ -170,6 +168,13 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
         );
+        require(
+            block.timestamp >=
+                ownedAt[tokenId] +
+                    marketplaceContract.transferAfterDays() *
+                    1 days,
+            "NalndaBook: Transfer not allowed!"
+        );
         _chargeTransferFees(tokenId);
         ownedAt[tokenId] = block.timestamp;
         _safeTransfer(from, to, tokenId, data);
@@ -198,6 +203,13 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
+        );
+        require(
+            block.timestamp >=
+                ownedAt[tokenId] +
+                    marketplaceContract.transferAfterDays() *
+                    1 days,
+            "NalndaBook: Transfer not allowed!"
         );
         _chargeTransferFees(tokenId);
         ownedAt[tokenId] = block.timestamp;
@@ -229,5 +241,9 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         lastSoldPrice[tokenId] = 0;
         ownedAt[tokenId] = 0;
         _burn(tokenId);
+    }
+
+    function renounceOwnership() public virtual override onlyOwner {
+        revert("Ownership of a book cannot be renounced!");
     }
 }

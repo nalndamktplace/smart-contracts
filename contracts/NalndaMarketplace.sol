@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -13,6 +13,8 @@ contract NalndaMarketplace is Ownable {
     mapping(address => address[]) public authorToBooks;
     uint256 public totalBooksCreated;
     uint256 public lastOrderId;
+    uint256 public transferAfterDays;
+    uint256 public secondarySaleAfterDays;
 
     //Events
     event NewBookCreated(
@@ -30,17 +32,25 @@ contract NalndaMarketplace is Ownable {
             "NalndaMarketplace: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        //fixing commision percent to 10%
-        protocolMintFee = 10;
+        protocolMintFee = 10; //10%
+        transferAfterDays = 21; //21 days
+        secondarySaleAfterDays = 21; //21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
+    }
+
+    function changeTransferAfterDays(uint256 _days) external onlyOwner {
+        transferAfterDays = _days;
+    }
+
+    function changeSecondarySaleAfterDays(uint256 _days) external onlyOwner {
+        secondarySaleAfterDays = _days;
     }
 
     function createNewBook(
         address _author,
         string memory _coverURI,
         uint256 _initialPrice,
-        uint256 _minPrimarySales,
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256 _genre
@@ -70,7 +80,6 @@ contract NalndaMarketplace is Ownable {
                 _author,
                 _coverURI,
                 _initialPrice,
-                _minPrimarySales,
                 _daysForSecondarySales,
                 _lang,
                 _genre
@@ -86,11 +95,15 @@ contract NalndaMarketplace is Ownable {
         author = Ownable(_book).owner();
     }
 
-    function withdrawCommissions() external onlyOwner {
-        uint256 balance = NALNDA.balanceOf(address(this));
+    function withdrawRevenue() external onlyOwner {
+        uint256 balance = getNALNDABalance();
         require(balance != 0, "NalndaMarketplace: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
         emit RevenueWithdrawn(balance);
+    }
+
+    function getNALNDABalance() public view returns (uint256 bal) {
+        bal = NALNDA.balanceOf((address(this)));
     }
 
     enum Stage {
@@ -133,8 +146,9 @@ contract NalndaMarketplace is Ownable {
             "NalndaMarketplace: Listing for this book is disabled by the book owner!"
         );
         require(
-            block.timestamp >= _book.ownedAt(_tokenId) + 90 days,
-            "NalndaMarketplace: Can't list the cover before atleast 90 days of owning it!"
+            block.timestamp >=
+                _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
+            "NalndaMarketplace: Can't list the cover at this time!"
         );
         _book.marketplaceTransfer(_msgSender(), address(this), _tokenId);
         lastOrderId++;
@@ -189,16 +203,16 @@ contract NalndaMarketplace is Ownable {
         //send seller its share
         uint256 sellerShare = (orderCache.price * 88) / 100; //88% to the seller
         NALNDA.transfer(orderCache.seller, sellerShare);
+        //update last sold price
+        orderCache.book.updateLastSoldPrice(
+            orderCache.tokenId,
+            orderCache.price
+        );
         //transfer NFT to the buyer
         orderCache.book.marketplaceTransfer(
             address(this),
             _msgSender(),
             orderCache.tokenId
-        );
-        //update last sold price
-        orderCache.book.updateLastSoldPrice(
-            orderCache.tokenId,
-            orderCache.price
         );
     }
 }

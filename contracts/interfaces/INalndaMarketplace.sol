@@ -6,6 +6,8 @@ interface INalndaMarketplace {
 
     function protocolMintFee() external view returns (uint256);
 
+    function transferAfterDays() external view returns (uint256);
+
     function createNewBook(
         address _author,
         string memory _coverURI,
