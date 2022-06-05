@@ -21,6 +21,28 @@ contract NalndaMarketplace is Ownable {
         address indexed _author,
         address _bookAddress,
         string _coverURI,
+        uint256 _price,
+        uint256 _lang,
+        uint256 _genre
+    );
+    event CoverListed(
+        uint256 indexed _orderId,
+        address _lister,
+        address indexed _book,
+        uint256 indexed _tokenId,
+        uint256 _price
+    );
+
+    event CoverUnlisted(
+        uint256 indexed _orderId,
+        address indexed _book,
+        uint256 indexed _tokenId
+    );
+    event CoverBought(
+        uint256 indexed _orderId,
+        address indexed _book,
+        uint256 indexed _tokenId,
+        address _buyer,
         uint256 _price
     );
 
@@ -88,7 +110,14 @@ contract NalndaMarketplace is Ownable {
         bookAddresses.push(_addressOutput);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
-        emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice);
+        emit NewBookCreated(
+            _author,
+            _addressOutput,
+            _coverURI,
+            _initialPrice,
+            _lang,
+            _genre
+        );
     }
 
     function bookToAuthor(address _book) public view returns (address author) {
@@ -160,6 +189,13 @@ contract NalndaMarketplace is Ownable {
             _tokenId,
             _price
         );
+        emit CoverListed(
+            lastOrderId,
+            _msgSender(),
+            address(_book),
+            _tokenId,
+            _price
+        );
     }
 
     function unlistCover(uint256 _orderId) external {
@@ -181,6 +217,11 @@ contract NalndaMarketplace is Ownable {
         orderCache.book.marketplaceTransfer(
             address(this),
             orderCache.seller,
+            orderCache.tokenId
+        );
+        emit CoverUnlisted(
+            orderCache.orderId,
+            address(orderCache.book),
             orderCache.tokenId
         );
     }
@@ -213,6 +254,13 @@ contract NalndaMarketplace is Ownable {
             address(this),
             _msgSender(),
             orderCache.tokenId
+        );
+        emit CoverBought(
+            orderCache.orderId,
+            address(orderCache.book),
+            orderCache.tokenId,
+            _msgSender(),
+            orderCache.price
         );
     }
 }
