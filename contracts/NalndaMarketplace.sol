@@ -4,6 +4,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./NalndaBook.sol";
 import "./interfaces/INalndaBook.sol";
+import "./interfaces/INalndaDiscount.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
 contract NalndaMarketplace is Ownable {
@@ -15,6 +16,7 @@ contract NalndaMarketplace is Ownable {
     uint256 public lastOrderId;
     uint256 public transferAfterDays;
     uint256 public secondarySaleAfterDays;
+    INalndaDiscount public discountContract;
 
     //Events
     event NewBookCreated(
@@ -59,6 +61,11 @@ contract NalndaMarketplace is Ownable {
         secondarySaleAfterDays = 21; //21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
+        discountContract = INalndaDiscount(address(0));
+    }
+
+    function setDiscountContract(address _newAddress) external onlyOwner {
+        discountContract = INalndaDiscount(_newAddress);
     }
 
     function changeTransferAfterDays(uint256 _days) external onlyOwner {

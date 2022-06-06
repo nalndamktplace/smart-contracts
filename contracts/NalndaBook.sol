@@ -58,7 +58,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         );
         require(
             Address.isContract(_msgSender()) == true,
-            "NalndaBook: Primary sales address is not a contract!!!"
+            "NalndaBook: Marketplace address is not a contract!!!"
         );
         require(
             _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
