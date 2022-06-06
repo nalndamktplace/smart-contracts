@@ -8,6 +8,14 @@ async function main() {
     const marketplace = await NalndaMarketplace.deploy(process.env.NALNDA_ERC20);
     await marketplace.deployed();
     console.log("NalndaMarketplace deployed to:", marketplace.address);
+    //deploying discounts
+    const NalndaDiscountV1 = await hre.ethers.getContractFactory("NalndaDiscountV1");
+    const discount_v1 = await NalndaDiscountV1.deploy(process.env.NALNDA_ERC20, marketplace.address, [], []);
+    await discount_v1.deployed();
+    console.log("NalndaDiscountV1 deployed to:", discount_v1.address);
+    console.log("setting address for discount contract...");
+    await marketplace.setDiscountContract(discount_v1.address);
+    console.log("done...");
 }
 
 main()
