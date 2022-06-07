@@ -9,8 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaMarketplace.sol";
-
-//renownce ownership discussion
+import "./interfaces/INalndaDiscount.sol";
 
 contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
@@ -28,7 +27,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
-    uint256 public totalCommisionsPaidOut;
 
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
@@ -58,7 +56,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         );
         require(
             Address.isContract(_msgSender()) == true,
-            "NalndaBook: Primary sales address is not a contract!!!"
+            "NalndaBook: Marketplace address is not a contract!!!"
         );
         require(
             _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
@@ -131,15 +129,32 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     function safeMint(address to) external {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
+        INalndaDiscount discount = INalndaDiscount(
+            marketplaceContract.discountContract()
+        );
+        uint256 commisionPayout;
+        uint256 ownerShare;
+        if (
+            address(discount) != address(0) &&
+            block.timestamp <= discount.expiry()
+        ) {
+            uint256 discountPercent = discount.getDiscount(_msgSender());
+            uint256 cashbackPayout = (mintPrice * discountPercent) / 100;
+            //send dicount cashback to buyer/minter
+            NALNDA.transfer(_msgSender(), cashbackPayout);
+            commisionPayout =
+                (mintPrice * (protocolMintFee - discountPercent)) /
+                100;
+            ownerShare = mintPrice - commisionPayout - cashbackPayout;
+        } else {
+            commisionPayout = (mintPrice * protocolMintFee) / 100;
+            ownerShare = mintPrice - commisionPayout;
+        }
         //send commision to marketplaceContract
-        uint256 commisionPayout = (mintPrice * protocolMintFee) / 100;
-        totalCommisionsPaidOut += commisionPayout;
         NALNDA.transfer(address(marketplaceContract), commisionPayout);
-        //send author's share to the author
-        uint256 authorShare = mintPrice - commisionPayout;
-        authorEarningsPaidout += authorShare;
-        NALNDA.transfer(owner(), authorShare);
-        // totalEarningsPayout += mintPrice;
+        //send author's share to the book owner
+        NALNDA.transfer(owner(), ownerShare);
+        authorEarningsPaidout += ownerShare;
         coverIdCounter.increment();
         uint256 _tokenId = coverIdCounter.current();
         lastSoldPrice[_tokenId] = mintPrice;
