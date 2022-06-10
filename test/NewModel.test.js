@@ -27,26 +27,25 @@ describe("NalndaMarketplace tests", function () {
     let newBook;
     describe('Creating new book:', () => {
         it("createNewBook(): should revert if address of the author passed is null", async function () {
-            await expect(marketplace.createNewBook(ZERO_ADDR, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("91"), BigNumber.from("1"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Author address can't be null!");
+            await expect(marketplace.createNewBook(ZERO_ADDR, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("91"), BigNumber.from("1"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Author address can't be null!");
         });
         it("createNewBook(): should revert if cover uri passed is empty", async () => {
-            await expect(marketplace.createNewBook(accounts[0].address, "", ethers.utils.parseEther("1"), BigNumber.from("91"), BigNumber.from("1"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Empty string passed as cover URI!");
+            await expect(marketplace.createNewBook(accounts[0].address, "", ethers.utils.parseEther("1"), BigNumber.from("91"), BigNumber.from("1"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Empty string passed as cover URI!");
         })
         it("createNewBook(): should revert if _daysForSecondarySales is out of range", async () => {
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("89"), BigNumber.from("1"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Days to secondary sales should be between 90 and 150!");
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("151"), BigNumber.from("1"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Days to secondary sales should be between 90 and 150!");
+            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("89"), BigNumber.from("1"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Days to secondary sales should be between 90 and 150!");
+            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("151"), BigNumber.from("1"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Days to secondary sales should be between 90 and 150!");
         })
         it("createNewBook(): should revert if _lang is out of range", async () => {
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("0"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Book language tag should be between 1 and 100!");
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("101"), BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Book language tag should be between 1 and 100!");
+            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("0"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Book language tag should be between 1 and 100!");
+            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("101"), ['1', '3'])).to.revertedWith("NalndaMarketplace: Book language tag should be between 1 and 100!");
         })
         it("createNewBook(): should revert if _genre is out of range", async () => {
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("1"), BigNumber.from("0"))).to.revertedWith("NalndaMarketplace: Book genre tag should be between 1 and 60!");
-            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("1"), BigNumber.from("61"))).to.revertedWith("NalndaMarketplace: Book genre tag should be between 1 and 60!");
+            await expect(marketplace.createNewBook(accounts[0].address, "test_uri", ethers.utils.parseEther("1"), BigNumber.from("92"), BigNumber.from("1"), ['0', '61'])).to.revertedWith("NalndaMarketplace: Book genre tag should be between 1 and 60!");
         })
         it("createNewBook(): should be able to create a new book, with covers prices at 100 NALNDA", async () => {
             try {
-                await marketplace.connect(ankit).createNewBook(accounts[1].address, "test_uri", ethers.utils.parseEther("100"), BigNumber.from("92"), BigNumber.from("20"), BigNumber.from("20"));
+                await marketplace.connect(ankit).createNewBook(accounts[1].address, "test_uri", ethers.utils.parseEther("100"), BigNumber.from("92"), BigNumber.from("20"), ['1', '3']);
             } catch (err) {
                 console.log(err);
             }
@@ -211,7 +210,7 @@ describe("NalndaMarketplace tests", function () {
         it("listCover(): should revert if there are no covers minted yet", async () => {
             await deployContracts();
             try {
-                await marketplace.connect(bhuvan).createNewBook(bhuvan.address, "test_uri", ethers.utils.parseEther("100"), BigNumber.from("92"), BigNumber.from("20"), BigNumber.from("20"));
+                await marketplace.connect(bhuvan).createNewBook(bhuvan.address, "test_uri", ethers.utils.parseEther("100"), BigNumber.from("92"), BigNumber.from("20"), ['20', '31']);
             } catch (err) {
                 console.log(err);
             }
@@ -236,9 +235,6 @@ describe("NalndaMarketplace tests", function () {
             } catch (err) {
                 console.log(err);
             }
-            // const blockNum = await ethers.provider.getBlockNumber();
-            // const block = await ethers.provider.getBlock(blockNum)
-            // console.log(await nalnda_book.secondarySalesTimestamp(), block.timestamp);
             await expect(marketplace.listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Seller should own the NFT to list!")
         })
         it("listCover(): should revert if listing of book is disabled by owner. (Secondary sales between 3 - 5 months)", async () => {

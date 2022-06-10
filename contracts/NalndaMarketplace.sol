@@ -25,7 +25,7 @@ contract NalndaMarketplace is Ownable {
         string _coverURI,
         uint256 _price,
         uint256 _lang,
-        uint256 _genre
+        uint256[] _genre
     );
     event CoverListed(
         uint256 indexed _orderId,
@@ -82,7 +82,7 @@ contract NalndaMarketplace is Ownable {
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
-        uint256 _genre
+        uint256[] memory _genre
     ) external {
         require(
             _author != address(0),
@@ -100,10 +100,11 @@ contract NalndaMarketplace is Ownable {
             _lang > 0 && _lang <= 100,
             "NalndaMarketplace: Book language tag should be between 1 and 100!"
         );
-        require(
-            _genre > 0 && _genre <= 60,
-            "NalndaMarketplace: Book genre tag should be between 1 and 60!"
-        );
+        for (uint256 i = 0; i < _genre.length; i++)
+            require(
+                _genre[i] > 0 && _genre[i] <= 60,
+                "NalndaMarketplace: Book genre tag should be between 1 and 60!"
+            );
         address _addressOutput = address(
             new NalndaBook(
                 _author,
