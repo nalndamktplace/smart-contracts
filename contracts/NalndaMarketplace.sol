@@ -97,12 +97,12 @@ contract NalndaMarketplace is Ownable {
             "NalndaMarketplace: Days to secondary sales should be between 90 and 150!"
         );
         require(
-            _lang > 0 && _lang <= 100,
+            _lang >= 0 && _lang < 100,
             "NalndaMarketplace: Book language tag should be between 1 and 100!"
         );
         for (uint256 i = 0; i < _genre.length; i++)
             require(
-                _genre[i] > 0 && _genre[i] <= 60,
+                _genre[i] >= 0 && _genre[i] < 100,
                 "NalndaMarketplace: Book genre tag should be between 1 and 60!"
             );
         address _addressOutput = address(

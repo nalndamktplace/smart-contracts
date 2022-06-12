@@ -63,12 +63,12 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
             "NalndaBook: Days to secondary sales should be between 90 and 150!"
         );
         require(
-            _lang > 0 && _lang <= 100,
+            _lang >= 0 && _lang < 100,
             "NalndaBook: Book language tag should be between 1 and 100!"
         );
         for (uint256 i = 0; i < _genre.length; i++)
             require(
-                _genre[i] > 0 && _genre[i] <= 60,
+                _genre[i] >= 0 && _genre[i] < 100,
                 "NalndaBook: Book genre tag should be between 1 and 60!"
             );
         creationTimestamp = block.timestamp;
