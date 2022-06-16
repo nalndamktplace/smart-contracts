@@ -11,9 +11,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaMarketplace.sol";
 import "./interfaces/INalndaDiscount.sol";
 
-contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
+contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
-
     Counters.Counter public coverIdCounter;
     IERC20 public immutable NALNDA;
     INalndaMarketplace public immutable marketplaceContract;
@@ -27,12 +26,10 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
-
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
     //token id => timestamp of last transfer
     mapping(uint256 => uint256) public ownedAt;
-
     modifier onlyMarketplace() {
         require(_msgSender() == address(marketplaceContract));
         _;
@@ -45,7 +42,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256[] memory _genre
-    ) ERC721("NalndaBookCover", "COVER") {
+    ) ERC721("NalndaITOBookCover", "COVER") {
         require(
             _author != address(0),
             "NalndaBook: Author's address can't be null!"
