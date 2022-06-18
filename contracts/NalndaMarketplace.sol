@@ -128,7 +128,19 @@ contract NalndaMarketplace is Ownable {
         );
     }
 
-    function bookToAuthor(address _book) public view returns (address author) {
+    function approveBooks(address[] memory _books) public onlyOwner {
+        for (uint256 i = 0; i < _books.length; i++) {
+            INalndaBook(_books[i]).changeApproval(true);
+        }
+    }
+
+    function unapproveBooks(address[] memory _books) external onlyOwner {
+        for (uint256 i = 0; i < _books.length; i++) {
+            INalndaBook(_books[i]).changeApproval(false);
+        }
+    }
+
+    function bookOwner(address _book) public view returns (address author) {
         author = Ownable(_book).owner();
     }
 

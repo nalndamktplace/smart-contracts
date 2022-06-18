@@ -23,4 +23,8 @@ interface INalndaBook is IERC721 {
     function ownedAt(uint256 _tokenId) external view returns (uint256);
 
     function lastSoldPrice(uint256 _tokenId) external view returns (uint256);
+
+    function approved() external view returns (bool);
+
+    function changeApproval(bool _newApproved) external;
 }
