@@ -41,7 +41,10 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     }
 
     modifier marketplaceApproved() {
-        require(approved == true, "NalndaBook: Marketplace approval required!");
+        require(
+            approved == true,
+            "NalndaBook: Book unapproved from marketplace!"
+        );
         _;
     }
 
@@ -254,7 +257,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address from,
         address to,
         uint256 tokenId
-    ) internal override marketplaceApproved whenNotPaused {
+    ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
@@ -263,7 +266,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address to,
         uint256 tokenId,
         bytes memory data
-    ) public virtual override {
+    ) public virtual override marketplaceApproved {
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
@@ -298,7 +301,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address from,
         address to,
         uint256 tokenId
-    ) public virtual override {
+    ) public virtual override marketplaceApproved {
         //solhint-disable-next-line max-line-length
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),

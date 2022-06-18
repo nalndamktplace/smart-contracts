@@ -9,10 +9,4 @@ interface INalndaMarketplace {
     function transferAfterDays() external view returns (uint256);
 
     function discountContract() external view returns (address);
-
-    function createNewBook(
-        address _author,
-        string memory _coverURI,
-        uint256 _initialPrice
-    ) external;
 }

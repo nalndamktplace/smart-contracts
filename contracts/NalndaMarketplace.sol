@@ -5,19 +5,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./NalndaBook.sol";
 import "./interfaces/INalndaBook.sol";
 import "./interfaces/INalndaDiscount.sol";
+import "./Dependencies/NalndaMarketplaceBase.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
-contract NalndaMarketplace is Ownable {
-    IERC20 public immutable NALNDA;
-    uint256 public immutable protocolMintFee; //primarySalesCommission percentage for primary sale/lazy minting
-    address[] public bookAddresses;
-    mapping(address => address[]) public authorToBooks;
-    uint256 public totalBooksCreated;
-    uint256 public lastOrderId;
-    uint256 public transferAfterDays;
-    uint256 public secondarySaleAfterDays;
-    INalndaDiscount public discountContract;
-
+contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     //Events
     event NewBookCreated(
         address indexed _author,
@@ -58,7 +49,7 @@ contract NalndaMarketplace is Ownable {
         NALNDA = IERC20(_NALNDA);
         protocolMintFee = 10; //10%
         transferAfterDays = 21; //21 days
-        secondarySaleAfterDays = 21; //21 days
+        secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
         discountContract = INalndaDiscount(address(0));
@@ -155,24 +146,6 @@ contract NalndaMarketplace is Ownable {
         bal = NALNDA.balanceOf((address(this)));
     }
 
-    enum Stage {
-        UNLISTED,
-        LISTED,
-        SOLD
-    }
-
-    struct Order {
-        Stage stage;
-        uint256 orderId;
-        address seller;
-        INalndaBook book;
-        uint256 tokenId;
-        uint256 price;
-    }
-
-    //orderId => Order
-    mapping(uint256 => Order) public ORDER;
-
     function listCover(
         INalndaBook _book,
         uint256 _tokenId,
@@ -192,7 +165,7 @@ contract NalndaMarketplace is Ownable {
         );
         require(
             block.timestamp >= _book.secondarySalesTimestamp(),
-            "NalndaMarketplace: Listing for this book is disabled by the book owner!"
+            "NalndaMarketplace: Listing for this book is disabled!"
         );
         require(
             block.timestamp >=
@@ -223,26 +196,25 @@ contract NalndaMarketplace is Ownable {
             _orderId <= lastOrderId,
             "NalndaMarketplace: Invalid order id!"
         );
-        Order memory orderCache = ORDER[_orderId];
         require(
-            orderCache.stage == Stage.LISTED,
+            ORDER[_orderId].stage == Stage.LISTED,
             "NalndaMarketplace: NFT not yet listed / already sold!"
         );
         require(
-            _msgSender() == orderCache.seller,
-            "NalndaMarketplace: Only seller can unlist!"
+            _msgSender() == ORDER[_orderId].seller || _msgSender() == owner(),
+            "NalndaMarketplace: Only seller or marketplace admin can unlist!"
         );
         ORDER[_orderId].stage = Stage.UNLISTED; //to prevent reentrancy
         //return the seller its cover
-        orderCache.book.marketplaceTransfer(
+        ORDER[_orderId].book.marketplaceTransfer(
             address(this),
-            orderCache.seller,
-            orderCache.tokenId
+            ORDER[_orderId].seller,
+            ORDER[_orderId].tokenId
         );
         emit CoverUnlisted(
-            orderCache.orderId,
-            address(orderCache.book),
-            orderCache.tokenId
+            ORDER[_orderId].orderId,
+            address(ORDER[_orderId].book),
+            ORDER[_orderId].tokenId
         );
     }
 
@@ -251,36 +223,42 @@ contract NalndaMarketplace is Ownable {
             _orderId <= lastOrderId,
             "NalndaMarketplace: Invalid order id!"
         );
-        Order memory orderCache = ORDER[_orderId];
         require(
-            orderCache.stage == Stage.LISTED,
+            ORDER[_orderId].book.approved() == true,
+            "NalndaMarketplace: Sales on this book are disabled!"
+        );
+        require(
+            ORDER[_orderId].stage == Stage.LISTED,
             "NalndaMarketplace: NFT not yet listed / already sold!"
         );
         ORDER[_orderId].stage = Stage.SOLD; //to prevent reentrancy
-        NALNDA.transferFrom(_msgSender(), address(this), orderCache.price);
+        NALNDA.transferFrom(_msgSender(), address(this), ORDER[_orderId].price);
         //send author commision
-        uint256 authorShare = (orderCache.price * 10) / 100; //10% for author
-        NALNDA.transfer(Ownable(address(orderCache.book)).owner(), authorShare);
+        uint256 authorShare = (ORDER[_orderId].price * 10) / 100; //10% for author
+        NALNDA.transfer(
+            Ownable(address(ORDER[_orderId].book)).owner(),
+            authorShare
+        );
         //send seller its share
-        uint256 sellerShare = (orderCache.price * 88) / 100; //88% to the seller
-        NALNDA.transfer(orderCache.seller, sellerShare);
+        uint256 sellerShare = (ORDER[_orderId].price * 88) / 100; //88% to the seller
+        NALNDA.transfer(ORDER[_orderId].seller, sellerShare);
         //update last sold price
-        orderCache.book.updateLastSoldPrice(
-            orderCache.tokenId,
-            orderCache.price
+        ORDER[_orderId].book.updateLastSoldPrice(
+            ORDER[_orderId].tokenId,
+            ORDER[_orderId].price
         );
         //transfer NFT to the buyer
-        orderCache.book.marketplaceTransfer(
+        ORDER[_orderId].book.marketplaceTransfer(
             address(this),
             _msgSender(),
-            orderCache.tokenId
+            ORDER[_orderId].tokenId
         );
         emit CoverBought(
-            orderCache.orderId,
-            address(orderCache.book),
-            orderCache.tokenId,
+            ORDER[_orderId].orderId,
+            address(ORDER[_orderId].book),
+            ORDER[_orderId].tokenId,
             _msgSender(),
-            orderCache.price
+            ORDER[_orderId].price
         );
     }
 }
