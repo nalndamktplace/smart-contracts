@@ -8,9 +8,9 @@ import "./interfaces/INalndaDiscount.sol";
 import "./Dependencies/NalndaMarketplaceBase.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
-contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
+contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
     //Events
-    event NewBookCreated(
+    event NewITOBookCreated(
         address indexed _author,
         address _bookAddress,
         string _coverURI,
@@ -18,26 +18,26 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         uint256 _lang,
         uint256[] _genre
     );
-    event CoverListed(
+    event ITOCoverListed(
         uint256 indexed _orderId,
         address _lister,
         address indexed _book,
         uint256 indexed _tokenId,
         uint256 _price
     );
-    event CoverUnlisted(
+    event ITOCoverUnlisted(
         uint256 indexed _orderId,
         address indexed _book,
         uint256 indexed _tokenId
     );
-    event CoverBought(
+    event ITOCoverBought(
         uint256 indexed _orderId,
         address indexed _book,
         uint256 indexed _tokenId,
         address _buyer,
         uint256 _price
     );
-    event RevenueWithdrawn(uint256 _revenueWithdrawn);
+    event ITORevenueWithdrawn(uint256 _revenueWithdrawn);
 
     constructor(address _NALNDA) {
         require(
@@ -65,7 +65,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         secondarySaleAfterDays = _days;
     }
 
-    function createNewBook(
+    function createNewITOBook(
         address _author,
         string memory _coverURI,
         uint256 _initialPrice,
@@ -107,7 +107,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         bookAddresses.push(_addressOutput);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
-        emit NewBookCreated(
+        emit NewITOBookCreated(
             _author,
             _addressOutput,
             _coverURI,
@@ -137,7 +137,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         uint256 balance = getNALNDABalance();
         require(balance != 0, "NalndaMarketplace: Nothing to withdraw!");
         NALNDA.transfer(owner(), balance);
-        emit RevenueWithdrawn(balance);
+        emit ITORevenueWithdrawn(balance);
     }
 
     function getNALNDABalance() public view returns (uint256 bal) {
@@ -180,7 +180,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             _tokenId,
             _price
         );
-        emit CoverListed(
+        emit ITOCoverListed(
             lastOrderId,
             _msgSender(),
             address(_book),
@@ -209,7 +209,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             ORDER[_orderId].seller,
             ORDER[_orderId].tokenId
         );
-        emit CoverUnlisted(
+        emit ITOCoverUnlisted(
             ORDER[_orderId].orderId,
             address(ORDER[_orderId].book),
             ORDER[_orderId].tokenId
@@ -251,7 +251,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             _msgSender(),
             ORDER[_orderId].tokenId
         );
-        emit CoverBought(
+        emit ITOCoverBought(
             ORDER[_orderId].orderId,
             address(ORDER[_orderId].book),
             ORDER[_orderId].tokenId,
