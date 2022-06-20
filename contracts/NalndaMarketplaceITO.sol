@@ -28,7 +28,8 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
     event ITOCoverUnlisted(
         uint256 indexed _orderId,
         address indexed _book,
-        uint256 indexed _tokenId
+        uint256 indexed _tokenId,
+        Stage _unlistedStage
     );
     event ITOCoverBought(
         uint256 indexed _orderId,
@@ -45,7 +46,6 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        protocolMintFee = 10; //10%
         transferAfterDays = 21; //21 days
         secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
@@ -65,7 +65,7 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
         secondarySaleAfterDays = _days;
     }
 
-    function createNewITOBook(
+    function createNewBook(
         address _author,
         string memory _coverURI,
         uint256 _initialPrice,
@@ -104,7 +104,6 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
                 _genre
             )
         );
-        bookAddresses.push(_addressOutput);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
         emit NewITOBookCreated(
@@ -202,7 +201,9 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
             _msgSender() == ORDER[_orderId].seller || _msgSender() == owner(),
             "NalndaMarketplace: Only seller or marketplace admin can unlist!"
         );
-        ORDER[_orderId].stage = Stage.UNLISTED; //to prevent reentrancy
+        _msgSender() == ORDER[_orderId].seller
+            ? ORDER[_orderId].stage = Stage.UNLISTED
+            : ORDER[_orderId].stage = Stage.UNLISTED_BY_ADMIN;
         //return the seller its cover
         ORDER[_orderId].book.marketplaceTransfer(
             address(this),
@@ -212,7 +213,8 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
         emit ITOCoverUnlisted(
             ORDER[_orderId].orderId,
             address(ORDER[_orderId].book),
-            ORDER[_orderId].tokenId
+            ORDER[_orderId].tokenId,
+            ORDER[_orderId].stage
         );
     }
 

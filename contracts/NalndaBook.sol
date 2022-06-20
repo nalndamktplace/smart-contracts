@@ -20,7 +20,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256 public immutable protocolMintFee;
     uint256 public immutable protocolFee;
     uint256 public immutable bookOwnerShare;
-    uint256 public immutable creationTimestamp;
     bool public approved;
     uint256 public immutable daysForSecondarySales;
     uint256 public secondarySalesTimestamp;
@@ -82,14 +81,13 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 "NalndaBook: Book genre tag should be between 1 and 60!"
             );
         approved = false;
-        creationTimestamp = block.timestamp;
         daysForSecondarySales = _daysForSecondarySales;
         secondarySalesTimestamp = 0;
         bookLang = _lang;
         bookGenre = _genre;
         marketplaceContract = INalndaMarketplace(_msgSender());
         transferOwnership(_author);
-        protocolMintFee = marketplaceContract.protocolMintFee();
+        protocolMintFee = 10; //10% on safemint
         protocolFee = 2; //2% on every transfer
         bookOwnerShare = 10; //10% on every transfer
         NALNDA = IERC20(marketplaceContract.NALNDA());
@@ -173,7 +171,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         INalndaDiscount discount = INalndaDiscount(
             marketplaceContract.discountContract()
         );
-        uint256 commisionPayout;
+        uint256 protocolPayout;
         uint256 ownerShare;
         if (
             address(discount) != address(0) &&
@@ -185,16 +183,16 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 //send dicount cashback to buyer/minter
                 NALNDA.transfer(_msgSender(), cashbackPayout);
             }
-            commisionPayout =
+            protocolPayout =
                 (mintPrice * (protocolMintFee - discountPercent)) /
                 100;
-            ownerShare = mintPrice - commisionPayout - cashbackPayout;
+            ownerShare = mintPrice - protocolPayout - cashbackPayout;
         } else {
-            commisionPayout = (mintPrice * protocolMintFee) / 100;
-            ownerShare = mintPrice - commisionPayout;
+            protocolPayout = (mintPrice * protocolMintFee) / 100;
+            ownerShare = mintPrice - protocolPayout;
         }
         //send commision to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), commisionPayout);
+        NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
         authorEarningsPaidout += ownerShare;
@@ -217,7 +215,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         INalndaDiscount discount = INalndaDiscount(
             marketplaceContract.discountContract()
         );
-        uint256 commisionPayout;
+        uint256 protocolPayout;
         uint256 ownerShare;
         if (
             address(discount) != address(0) &&
@@ -229,16 +227,14 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 //send dicount cashback to buyer/minter
                 NALNDA.transfer(_msgSender(), cashbackPayout);
             }
-            commisionPayout =
-                (cost * (protocolMintFee - discountPercent)) /
-                100;
-            ownerShare = cost - commisionPayout - cashbackPayout;
+            protocolPayout = (cost * (protocolMintFee - discountPercent)) / 100;
+            ownerShare = cost - protocolPayout - cashbackPayout;
         } else {
-            commisionPayout = (cost * protocolMintFee) / 100;
-            ownerShare = cost - commisionPayout;
+            protocolPayout = (cost * protocolMintFee) / 100;
+            ownerShare = cost - protocolPayout;
         }
         //send commision to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), commisionPayout);
+        NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
         authorEarningsPaidout += ownerShare;
@@ -347,6 +343,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     }
 
     function renounceOwnership() public virtual override onlyOwner {
-        revert("Ownership of a book cannot be renounced!");
+        revert("NalndaBook: Ownership of a book cannot be renounced!");
     }
 }

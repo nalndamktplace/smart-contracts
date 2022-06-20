@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -7,10 +7,6 @@ import "../interfaces/INalndaBook.sol";
 
 abstract contract NalndaMarketplaceBase {
     IERC20 public NALNDA;
-
-    uint256 public protocolMintFee; //primarySalesCommission percentage for primary sale/lazy minting
-
-    address[] public bookAddresses;
 
     mapping(address => address[]) public authorToBooks;
 
@@ -27,7 +23,8 @@ abstract contract NalndaMarketplaceBase {
     enum Stage {
         UNLISTED,
         LISTED,
-        SOLD
+        SOLD,
+        UNLISTED_BY_ADMIN
     }
 
     struct Order {

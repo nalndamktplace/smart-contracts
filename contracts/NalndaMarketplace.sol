@@ -28,7 +28,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     event CoverUnlisted(
         uint256 indexed _orderId,
         address indexed _book,
-        uint256 indexed _tokenId
+        uint256 indexed _tokenId,
+        Stage _unlistedStage
     );
     event CoverBought(
         uint256 indexed _orderId,
@@ -45,7 +46,6 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        protocolMintFee = 10; //10%
         transferAfterDays = 21; //21 days
         secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
@@ -104,7 +104,6 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
                 _genre
             )
         );
-        bookAddresses.push(_addressOutput);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
         emit NewBookCreated(
@@ -202,7 +201,9 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             _msgSender() == ORDER[_orderId].seller || _msgSender() == owner(),
             "NalndaMarketplace: Only seller or marketplace admin can unlist!"
         );
-        ORDER[_orderId].stage = Stage.UNLISTED; //to prevent reentrancy
+        _msgSender() == ORDER[_orderId].seller
+            ? ORDER[_orderId].stage = Stage.UNLISTED
+            : ORDER[_orderId].stage = Stage.UNLISTED_BY_ADMIN;
         //return the seller its cover
         ORDER[_orderId].book.marketplaceTransfer(
             address(this),
@@ -212,7 +213,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         emit CoverUnlisted(
             ORDER[_orderId].orderId,
             address(ORDER[_orderId].book),
-            ORDER[_orderId].tokenId
+            ORDER[_orderId].tokenId,
+            ORDER[_orderId].stage
         );
     }
 
