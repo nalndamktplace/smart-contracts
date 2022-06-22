@@ -5,6 +5,4 @@ interface INalndaMarketplaceITO {
     function NALNDA() external view returns (address);
 
     function transferAfterDays() external view returns (uint256);
-
-    function discountContract() external view returns (address);
 }

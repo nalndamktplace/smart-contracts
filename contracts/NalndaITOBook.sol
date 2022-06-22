@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaMarketplaceITO.sol";
-import "./interfaces/INalndaDiscount.sol";
 
 contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
@@ -25,8 +24,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     INalndaMarketplaceITO public immutable marketplaceContract;
     uint256 public immutable protocolMintFee;
     uint256 public immutable protocolITOMintFee;
-    uint256 public immutable protocolFee;
-    uint256 public immutable bookOwnerShare;
+    uint256 public immutable protocolTransferFee;
+    uint256 public immutable transfersBookOwnerShare;
     bool public startNormalSalesTransfers; //start normal sales after ITO sales
     ITOStage public currentITOStage;
     uint256 public immutable daysForSecondarySales;
@@ -35,7 +34,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256[] public bookGenre;
     string public uri;
     uint256 public mintPrice;
-    uint256 public authorEarningsPaidout;
+    uint256 public ownerEarningsPaidout;
     uint256 public totalDOs; //make sure it is not zero when you divide
 
     // token id => last sale price
@@ -105,8 +104,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         transferOwnership(_author);
         protocolITOMintFee = 20; // fee in ITO phase
         protocolMintFee = 10; // fee after ITO phase
-        protocolFee = 2; //2% on every transfer
-        bookOwnerShare = 10; //10% on every transfer
+        protocolTransferFee = 2; //2% on every transfer
+        transfersBookOwnerShare = 10; //10% on every transfer
         NALNDA = IERC20(marketplaceContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
@@ -131,7 +130,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         }
     }
 
-    // Just in case all the addresses are not added
+    // Just in case all the addresses are not added add them after the ito has started using this
     function addMoreApprovedAddresses(address[] memory _approvedAddresses)
         external
         onlyMarketplace
@@ -162,34 +161,13 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         claimed[_msgSender()] = true; //prevents reentrancy
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
-        INalndaDiscount discount = INalndaDiscount(
-            marketplaceContract.discountContract()
-        );
-        uint256 protocolPayout;
-        uint256 ownerShare;
-        if (
-            address(discount) != address(0) &&
-            block.timestamp <= discount.expiry()
-        ) {
-            uint256 discountPercent = discount.getDiscount(_msgSender());
-            uint256 cashbackPayout = (mintPrice * discountPercent) / 100;
-            if (cashbackPayout != 0) {
-                //send dicount cashback to buyer/minter
-                NALNDA.transfer(_msgSender(), cashbackPayout);
-            }
-            protocolPayout =
-                (mintPrice * (protocolITOMintFee - discountPercent)) /
-                100;
-            ownerShare = mintPrice - protocolPayout - cashbackPayout;
-        } else {
-            protocolPayout = (mintPrice * protocolITOMintFee) / 100;
-            ownerShare = mintPrice - protocolPayout;
-        }
-        //send commision to marketplaceContract
+        uint256 protocolPayout = (mintPrice * protocolITOMintFee) / 100;
+        uint256 ownerShare = mintPrice - protocolPayout;
+        //send commission to marketplaceContract
         NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
-        authorEarningsPaidout += ownerShare;
+        ownerEarningsPaidout += ownerShare;
         coverIdCounter.increment();
         uint256 _tokenId = coverIdCounter.current();
         lastSoldPrice[_tokenId] = mintPrice;
@@ -197,11 +175,15 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), _msgSender(), _tokenId);
+        isDO[_msgSender()] = true;
+        DistributedOwners.push(_msgSender());
         //if total Distributed Owners have minted their tokens start sales and transfers
         if (_tokenId == totalDOs) {
             _startSalesTransfers();
         }
     }
+
+    address[] public DistributedOwners;
 
     // Ideally sales and transfers sould start after fixed number of tokens are minted,
     // but in case it does not happen marketplace admin can start them manually
@@ -214,17 +196,16 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
             startNormalSalesTransfers == false,
             "NalndaITOBook: Sales and transfers already started!"
         );
-        //check with keshav
-        // require(
-        //     coverIdCounter.current() != 0,
-        //     "NalndaITOBook: Can't start sales and transfers in case of 0 DOs!"
-        // );
+        require(
+            coverIdCounter.current() != 0,
+            "NalndaITOBook: Can't start sales and transfers in case of 0 DOs!"
+        );
         _startSalesTransfers();
         totalDOs = coverIdCounter.current();
     }
 
     function _startSalesTransfers() internal {
-        currentITOStage = ITOStage.ENDED; //end ITO
+        currentITOStage = ITOStage.ENDED; // end ITO
         startNormalSalesTransfers = true; // start normal sales and transfers
         secondarySalesTimestamp =
             block.timestamp +
@@ -302,34 +283,15 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     function safeMint(address to) external salesAndTransfersStarted {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
-        INalndaDiscount discount = INalndaDiscount(
-            marketplaceContract.discountContract()
-        );
-        uint256 protocolPayout;
-        uint256 ownerShare;
-        if (
-            address(discount) != address(0) &&
-            block.timestamp <= discount.expiry()
-        ) {
-            uint256 discountPercent = discount.getDiscount(_msgSender());
-            uint256 cashbackPayout = (mintPrice * discountPercent) / 100;
-            if (cashbackPayout != 0) {
-                //send dicount cashback to buyer/minter
-                NALNDA.transfer(_msgSender(), cashbackPayout);
-            }
-            protocolPayout =
-                (mintPrice * (protocolMintFee - discountPercent)) /
-                100;
-            ownerShare = mintPrice - protocolPayout - cashbackPayout;
-        } else {
-            protocolPayout = (mintPrice * protocolMintFee) / 100;
-            ownerShare = mintPrice - protocolPayout;
-        }
-        //send commision to marketplaceContract
+        uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
+        //send commission to marketplaceContract
         NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        uint256 afterProtocolPayout = mintPrice - protocolPayout;
+        uint256 ownerShare = (afterProtocolPayout * 70) / 100;
+        totalDOCommissions += (afterProtocolPayout * 30) / 100; //remaining 30 % will go to DOs
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
-        authorEarningsPaidout += ownerShare;
+        ownerEarningsPaidout += ownerShare;
         coverIdCounter.increment();
         uint256 _tokenId = coverIdCounter.current();
         lastSoldPrice[_tokenId] = mintPrice;
@@ -346,32 +308,15 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         //transfer the minting cost to the contract
         uint256 cost = mintPrice * addresses.length;
         NALNDA.transferFrom(_msgSender(), address(this), cost);
-        INalndaDiscount discount = INalndaDiscount(
-            marketplaceContract.discountContract()
-        );
-        uint256 protocolPayout;
-        uint256 ownerShare;
-        if (
-            address(discount) != address(0) &&
-            block.timestamp <= discount.expiry()
-        ) {
-            uint256 discountPercent = discount.getDiscount(_msgSender());
-            uint256 cashbackPayout = (cost * discountPercent) / 100;
-            if (cashbackPayout != 0) {
-                //send dicount cashback to buyer/minter
-                NALNDA.transfer(_msgSender(), cashbackPayout);
-            }
-            protocolPayout = (cost * (protocolMintFee - discountPercent)) / 100;
-            ownerShare = cost - protocolPayout - cashbackPayout;
-        } else {
-            protocolPayout = (cost * protocolMintFee) / 100;
-            ownerShare = cost - protocolPayout;
-        }
-        //send commision to marketplaceContract
+        uint256 protocolPayout = (cost * protocolMintFee) / 100;
+        //send commission to marketplaceContract
         NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        uint256 afterProtocolPayout = mintPrice - protocolPayout;
+        uint256 ownerShare = (afterProtocolPayout * 70) / 100;
+        totalDOCommissions += (afterProtocolPayout * 30) / 100; //remaining 30 % will go to DOs
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
-        authorEarningsPaidout += ownerShare;
+        ownerEarningsPaidout += ownerShare;
         for (uint256 i = 0; i < addresses.length; i++) {
             coverIdCounter.increment();
             uint256 _tokenId = coverIdCounter.current();
@@ -381,6 +326,47 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
             _safeMint(owner(), _tokenId);
             _transfer(owner(), addresses[i], _tokenId);
         }
+    }
+
+    uint256 public totalDOCommissions;
+
+    mapping(address => bool) public isDO;
+    mapping(address => bool) withdrawnAtleastOnce;
+    mapping(address => uint256) oldTotalDOCommissions;
+
+    function withdrawDOCommission() external {
+        require(
+            isDO[_msgSender()] == true,
+            "NalndaITOBook: Only DOs can withdraw their commissions!"
+        );
+        uint256 commissionPayout = DOCommission(_msgSender());
+        require(
+            commissionPayout > 0,
+            "NalndaITOBook: No more commissions to withdraw!"
+        );
+        NALNDA.transfer(_msgSender(), commissionPayout);
+        oldTotalDOCommissions[_msgSender()] = totalDOCommissions;
+        if (withdrawnAtleastOnce[_msgSender()] == false)
+            withdrawnAtleastOnce[_msgSender()] = true;
+    }
+
+    function DOCommission(address _addr) public view returns (uint256 com) {
+        if (isDO[_addr] == true) {
+            if (withdrawnAtleastOnce[_addr] == false) {
+                com = totalDOCommissions / totalDOs;
+            } else {
+                uint256 gain = totalDOCommissions -
+                    oldTotalDOCommissions[_addr];
+                com = gain / totalDOs;
+            }
+        } else com = 0;
+    }
+
+    function increaseTotalDOCommissions(uint256 _increaseBy)
+        external
+        onlyMarketplace
+    {
+        totalDOCommissions += _increaseBy;
     }
 
     function _beforeTokenTransfer(
@@ -416,15 +402,18 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     function _chargeTransferFees(uint256 tokenId) internal {
         uint256 lastSellPrice = lastSoldPrice[tokenId];
         //charging transfer fee
-        uint256 totalFee = (lastSellPrice * (bookOwnerShare + protocolFee)) /
-            100;
+        uint256 totalFee = (lastSellPrice *
+            (transfersBookOwnerShare + protocolTransferFee)) / 100;
         NALNDA.transferFrom(_msgSender(), address(this), totalFee);
-        //send owner share to the book owner
-        uint256 ownerShare = (lastSellPrice * bookOwnerShare) / 100;
-        NALNDA.transfer(owner(), ownerShare);
         //send protocol its share
-        uint256 protocolShare = (lastSellPrice * protocolFee) / 100;
-        NALNDA.transfer(address(marketplaceContract), protocolShare);
+        uint256 protocolPayout = (lastSellPrice * protocolTransferFee) / 100;
+        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        //send owner share to the book owner
+        // uint256 ownerShare = (lastSellPrice * transfersBookOwnerShare) / 100;
+        uint256 afterProtocolPayout = totalFee - protocolPayout;
+        uint256 ownerShare = (afterProtocolPayout * 70) / 100;
+        totalDOCommissions += (afterProtocolPayout * 30) / 100; //remaining 30 % will go to DOs
+        NALNDA.transfer(owner(), ownerShare);
     }
 
     function transferFrom(

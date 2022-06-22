@@ -2,13 +2,12 @@
 pragma solidity 0.8.15;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./NalndaBook.sol";
-import "./interfaces/INalndaBook.sol";
-import "./interfaces/INalndaDiscount.sol";
-import "./Dependencies/NalndaMarketplaceBase.sol";
+import "./NalndaITOBook.sol";
+import "./interfaces/INalndaITOBook.sol";
+import "./Dependencies/NalndaMarketplaceITOBase.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
-contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
+contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
     //Events
     event NewITOBookCreated(
         address indexed _author,
@@ -50,23 +49,19 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
         secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
-        discountContract = INalndaDiscount(address(0));
     }
 
-    function setDiscountContract(address _newAddress) external onlyOwner {
-        discountContract = INalndaDiscount(_newAddress);
-    }
+    // function changeTransferAfterDays(uint256 _days) external onlyOwner {
+    //     transferAfterDays = _days;
+    // }
 
-    function changeTransferAfterDays(uint256 _days) external onlyOwner {
-        transferAfterDays = _days;
-    }
-
-    function changeSecondarySaleAfterDays(uint256 _days) external onlyOwner {
-        secondarySaleAfterDays = _days;
-    }
+    // function changeSecondarySaleAfterDays(uint256 _days) external onlyOwner {
+    //     secondarySaleAfterDays = _days;
+    // }
 
     function createNewBook(
         address _author,
+        uint256 _initialTotalDOs,
         string memory _coverURI,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
@@ -95,7 +90,8 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
                 "NalndaMarketplace: Book genre tag should be between 1 and 60!"
             );
         address _addressOutput = address(
-            new NalndaBook(
+            new NalndaITOBook(
+                _initialTotalDOs,
                 _author,
                 _coverURI,
                 _initialPrice,
@@ -116,17 +112,18 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
         );
     }
 
-    function approveBooks(address[] memory _books) public onlyOwner {
-        for (uint256 i = 0; i < _books.length; i++) {
-            INalndaBook(_books[i]).changeApproval(true);
-        }
+    function approveBookStartITO(
+        address _book,
+        address[] memory _approvedAddresses
+    ) public onlyOwner {
+        INalndaITOBook(_book).approveBookStartITO(_approvedAddresses);
     }
 
-    function unapproveBooks(address[] memory _books) external onlyOwner {
-        for (uint256 i = 0; i < _books.length; i++) {
-            INalndaBook(_books[i]).changeApproval(false);
-        }
-    }
+    // function unapproveBooks(address[] memory _books) external onlyOwner {
+    //     for (uint256 i = 0; i < _books.length; i++) {
+    //         INalndaITOBook(_books[i]).changeApproval(false);
+    //     }
+    // }
 
     function bookOwner(address _book) public view returns (address author) {
         author = Ownable(_book).owner();
@@ -144,7 +141,7 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
     }
 
     function listCover(
-        INalndaBook _book,
+        INalndaITOBook _book,
         uint256 _tokenId,
         uint256 _price
     ) external {
@@ -224,7 +221,7 @@ contract NalndaMarketplaceITO is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: Invalid order id!"
         );
         require(
-            ORDER[_orderId].book.approved() == true,
+            ORDER[_orderId].book.startNormalSalesTransfers() == true,
             "NalndaMarketplace: Sales on this book are disabled!"
         );
         require(
