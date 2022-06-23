@@ -28,4 +28,10 @@ interface INalndaITOBook is IERC721 {
 
     function addMoreApprovedAddresses(address[] memory _approvedAddresses)
         external;
+
+    function startSalesTransfersManually() external;
+
+    function stopSalesTransfers() external;
+
+    function increaseTotalDOCommissions(uint256 _increaseBy) external;
 }

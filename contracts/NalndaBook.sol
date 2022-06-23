@@ -82,7 +82,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
             );
         approved = false;
         daysForSecondarySales = _daysForSecondarySales;
-        secondarySalesTimestamp = 0;
+        secondarySalesTimestamp = 2**256 - 1;
         bookLang = _lang;
         bookGenre = _genre;
         marketplaceContract = INalndaMarketplace(_msgSender());
@@ -104,7 +104,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 1 days;
         } else {
             require(approved == true, "NalndaBook: Already unapproved!");
-            secondarySalesTimestamp = 0;
+            secondarySalesTimestamp = 2**256 - 1;
         }
         approved = _newApproved;
     }

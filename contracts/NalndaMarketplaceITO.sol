@@ -1,13 +1,38 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./NalndaITOBook.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "./interfaces/INalndaITOBook.sol";
-import "./Dependencies/NalndaMarketplaceITOBase.sol";
+import "./interfaces/INalndaMaster.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
-contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
+contract NalndaMarketplaceITO is Context {
+    INalndaMaster public immutable master;
+
+    IERC20 public immutable NALNDA;
+
+    uint256 public lastOrderId;
+
+    enum Stage {
+        UNLISTED,
+        LISTED,
+        SOLD,
+        UNLISTED_BY_ADMIN
+    }
+
+    struct Order {
+        Stage stage;
+        uint256 orderId;
+        address seller;
+        INalndaITOBook book;
+        uint256 tokenId;
+        uint256 price;
+    }
+
+    //orderId => Order
+    mapping(uint256 => Order) public ORDER;
     //Events
     event NewITOBookCreated(
         address indexed _author,
@@ -37,107 +62,15 @@ contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
         address _buyer,
         uint256 _price
     );
-    event ITORevenueWithdrawn(uint256 _revenueWithdrawn);
 
     constructor(address _NALNDA) {
         require(
             _NALNDA != address(0),
-            "NalndaMarketplace: NALNDA token's address can't be null!"
+            "NalndaMarketplaceITO: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        transferAfterDays = 21; //21 days
-        secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
-        totalBooksCreated = 0;
+        master = INalndaMaster(_msgSender());
         lastOrderId = 0;
-    }
-
-    // function changeTransferAfterDays(uint256 _days) external onlyOwner {
-    //     transferAfterDays = _days;
-    // }
-
-    // function changeSecondarySaleAfterDays(uint256 _days) external onlyOwner {
-    //     secondarySaleAfterDays = _days;
-    // }
-
-    function createNewBook(
-        address _author,
-        uint256 _initialTotalDOs,
-        string memory _coverURI,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre
-    ) external {
-        require(
-            _author != address(0),
-            "NalndaMarketplace: Author address can't be null!"
-        );
-        require(
-            bytes(_coverURI).length > 0,
-            "NalndaMarketplace: Empty string passed as cover URI!"
-        );
-        require(
-            _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
-            "NalndaMarketplace: Days to secondary sales should be between 90 and 150!"
-        );
-        require(
-            _lang >= 0 && _lang < 100,
-            "NalndaMarketplace: Book language tag should be between 1 and 100!"
-        );
-        for (uint256 i = 0; i < _genre.length; i++)
-            require(
-                _genre[i] >= 0 && _genre[i] < 100,
-                "NalndaMarketplace: Book genre tag should be between 1 and 60!"
-            );
-        address _addressOutput = address(
-            new NalndaITOBook(
-                _initialTotalDOs,
-                _author,
-                _coverURI,
-                _initialPrice,
-                _daysForSecondarySales,
-                _lang,
-                _genre
-            )
-        );
-        authorToBooks[_msgSender()].push(_addressOutput);
-        totalBooksCreated++;
-        emit NewITOBookCreated(
-            _author,
-            _addressOutput,
-            _coverURI,
-            _initialPrice,
-            _lang,
-            _genre
-        );
-    }
-
-    function approveBookStartITO(
-        address _book,
-        address[] memory _approvedAddresses
-    ) public onlyOwner {
-        INalndaITOBook(_book).approveBookStartITO(_approvedAddresses);
-    }
-
-    // function unapproveBooks(address[] memory _books) external onlyOwner {
-    //     for (uint256 i = 0; i < _books.length; i++) {
-    //         INalndaITOBook(_books[i]).changeApproval(false);
-    //     }
-    // }
-
-    function bookOwner(address _book) public view returns (address author) {
-        author = Ownable(_book).owner();
-    }
-
-    function withdrawRevenue() external onlyOwner {
-        uint256 balance = getNALNDABalance();
-        require(balance != 0, "NalndaMarketplace: Nothing to withdraw!");
-        NALNDA.transfer(owner(), balance);
-        emit ITORevenueWithdrawn(balance);
-    }
-
-    function getNALNDABalance() public view returns (uint256 bal) {
-        bal = NALNDA.balanceOf((address(this)));
     }
 
     function listCover(
@@ -147,24 +80,26 @@ contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
     ) external {
         require(
             Address.isContract(address(_book)) == true,
-            "NalndaMarketplace: Invalid book address!"
+            "NalndaMarketplaceITO: Invalid book address!"
         );
         require(
             _tokenId <= _book.coverIdCounter(),
-            "NalndaMarketplace: Invalid tokenId provided!"
+            "NalndaMarketplaceITO: Invalid tokenId provided!"
         );
         require(
             _book.ownerOf(_tokenId) == _msgSender(),
-            "NalndaMarketplace: Seller should own the NFT to list!"
+            "NalndaMarketplaceITO: Seller should own the NFT to list!"
         );
         require(
             block.timestamp >= _book.secondarySalesTimestamp(),
-            "NalndaMarketplace: Listing for this book is disabled!"
+            "NalndaMarketplaceITO: Listing for this book is disabled!"
         );
         require(
             block.timestamp >=
-                _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
-            "NalndaMarketplace: Can't list the cover at this time!"
+                _book.ownedAt(_tokenId) +
+                    master.secondarySaleAfterDays() *
+                    1 days,
+            "NalndaMarketplaceITO: Can't list the cover at this time!"
         );
         _book.marketplaceTransfer(_msgSender(), address(this), _tokenId);
         lastOrderId++;
@@ -188,15 +123,16 @@ contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
     function unlistCover(uint256 _orderId) external {
         require(
             _orderId <= lastOrderId,
-            "NalndaMarketplace: Invalid order id!"
+            "NalndaMarketplaceITO: Invalid order id!"
         );
         require(
             ORDER[_orderId].stage == Stage.LISTED,
-            "NalndaMarketplace: NFT not yet listed / already sold!"
+            "NalndaMarketplaceITO: NFT not yet listed / already sold!"
         );
         require(
-            _msgSender() == ORDER[_orderId].seller || _msgSender() == owner(),
-            "NalndaMarketplace: Only seller or marketplace admin can unlist!"
+            _msgSender() == ORDER[_orderId].seller ||
+                _msgSender() == master.owner(),
+            "NalndaMarketplaceITO: Only seller or master admin can unlist!"
         );
         _msgSender() == ORDER[_orderId].seller
             ? ORDER[_orderId].stage = Stage.UNLISTED
@@ -218,27 +154,35 @@ contract NalndaMarketplaceITO is NalndaMarketplaceITOBase, Ownable {
     function buyCover(uint256 _orderId) external {
         require(
             _orderId <= lastOrderId,
-            "NalndaMarketplace: Invalid order id!"
+            "NalndaMarketplaceITO: Invalid order id!"
         );
         require(
             ORDER[_orderId].book.startNormalSalesTransfers() == true,
-            "NalndaMarketplace: Sales on this book are disabled!"
+            "NalndaMarketplaceITO: Sales on this book are disabled!"
         );
         require(
             ORDER[_orderId].stage == Stage.LISTED,
-            "NalndaMarketplace: NFT not yet listed / already sold!"
+            "NalndaMarketplaceITO: NFT not yet listed / already sold!"
         );
         ORDER[_orderId].stage = Stage.SOLD; //to prevent reentrancy
         NALNDA.transferFrom(_msgSender(), address(this), ORDER[_orderId].price);
+        //send seller its share
+        uint256 sellerShare = (ORDER[_orderId].price * 88) / 100; //88% to the seller
+        NALNDA.transfer(ORDER[_orderId].seller, sellerShare);
+        //send protocol its share
+        uint256 protocolFee = (ORDER[_orderId].price * 2) / 100; //2% to the master
+        NALNDA.transfer(address(master), protocolFee);
+        uint256 remaining = (ORDER[_orderId].price * 10) / 100; //remaining 10%
         //send author commision
-        uint256 authorShare = (ORDER[_orderId].price * 10) / 100; //10% for author
+        uint256 authorShare = (remaining * 70) / 100; //70% of 10% to the book owner
         NALNDA.transfer(
             Ownable(address(ORDER[_orderId].book)).owner(),
             authorShare
         );
-        //send seller its share
-        uint256 sellerShare = (ORDER[_orderId].price * 88) / 100; //88% to the seller
-        NALNDA.transfer(ORDER[_orderId].seller, sellerShare);
+        uint256 DOCommissions = (remaining * 30) / 100; //30% of 10% to the DOs
+        NALNDA.transfer(address(ORDER[_orderId].book), DOCommissions);
+        //update DOCommissions
+        ORDER[_orderId].book.increaseTotalDOCommissions(DOCommissions);
         //update last sold price
         ORDER[_orderId].book.updateLastSoldPrice(
             ORDER[_orderId].tokenId,

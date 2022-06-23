@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/INalndaMarketplaceITO.sol";
+import "./interfaces/INalndaMaster.sol";
 
 contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
@@ -21,7 +21,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     Counters.Counter public coverIdCounter;
     IERC20 public immutable NALNDA;
-    INalndaMarketplaceITO public immutable marketplaceContract;
+    INalndaMaster public immutable masterContract;
+    address public immutable marketplaceContract;
     uint256 public immutable protocolMintFee;
     uint256 public immutable protocolITOMintFee;
     uint256 public immutable protocolTransferFee;
@@ -42,8 +43,12 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     //token id => timestamp of last transfer
     mapping(uint256 => uint256) public ownedAt;
 
+    modifier onlyMaster() {
+        require(_msgSender() == address(masterContract));
+        _;
+    }
     modifier onlyMarketplace() {
-        require(_msgSender() == address(marketplaceContract));
+        require(_msgSender() == marketplaceContract);
         _;
     }
 
@@ -97,16 +102,17 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         startNormalSalesTransfers = false;
         currentITOStage = ITOStage.NOT_STARTED;
         daysForSecondarySales = _daysForSecondarySales;
-        secondarySalesTimestamp = 0;
+        secondarySalesTimestamp = 2**256 - 1;
         bookLang = _lang;
         bookGenre = _genre;
-        marketplaceContract = INalndaMarketplaceITO(_msgSender());
+        masterContract = INalndaMaster(_msgSender());
+        marketplaceContract = masterContract.ITOMarketplace();
         transferOwnership(_author);
         protocolITOMintFee = 20; // fee in ITO phase
         protocolMintFee = 10; // fee after ITO phase
         protocolTransferFee = 2; //2% on every transfer
         transfersBookOwnerShare = 10; //10% on every transfer
-        NALNDA = IERC20(marketplaceContract.NALNDA());
+        NALNDA = IERC20(masterContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
     }
@@ -117,7 +123,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     function approveBookStartITO(address[] memory _approvedAddresses)
         external
-        onlyMarketplace
+        onlyMaster
     {
         require(
             currentITOStage == ITOStage.NOT_STARTED,
@@ -133,7 +139,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     // Just in case all the addresses are not added add them after the ito has started using this
     function addMoreApprovedAddresses(address[] memory _approvedAddresses)
         external
-        onlyMarketplace
+        onlyMaster
     {
         require(
             currentITOStage == ITOStage.STARTED,
@@ -163,8 +169,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
         uint256 protocolPayout = (mintPrice * protocolITOMintFee) / 100;
         uint256 ownerShare = mintPrice - protocolPayout;
-        //send commission to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        //send commission to masterContract
+        NALNDA.transfer(address(masterContract), protocolPayout);
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
         ownerEarningsPaidout += ownerShare;
@@ -187,7 +193,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     // Ideally sales and transfers sould start after fixed number of tokens are minted,
     // but in case it does not happen marketplace admin can start them manually
-    function startSalesTransfersManually() external onlyMarketplace {
+    function startSalesTransfersManually() external onlyMaster {
         require(
             currentITOStage == ITOStage.STARTED,
             "NalndaITOBook: ITO not started/already ended!"
@@ -213,13 +219,13 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
             1 days;
     }
 
-    function stopSalesTransfers() external onlyMarketplace {
+    function stopSalesTransfers() external onlyMaster {
         require(
             currentITOStage == ITOStage.STARTED ||
                 startNormalSalesTransfers == true,
             "NalndaITOBook: Either the ITO should be going on or normal sales and transfers should be going on!"
         );
-        secondarySalesTimestamp = 0;
+        secondarySalesTimestamp = 2**256 - 1;
         currentITOStage = ITOStage.ENDED;
         startNormalSalesTransfers = false;
     }
@@ -284,8 +290,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
         uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
-        //send commission to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        //send commission to masterContract
+        NALNDA.transfer(address(masterContract), protocolPayout);
         uint256 afterProtocolPayout = mintPrice - protocolPayout;
         uint256 ownerShare = (afterProtocolPayout * 70) / 100;
         totalDOCommissions += (afterProtocolPayout * 30) / 100; //remaining 30 % will go to DOs
@@ -309,8 +315,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         uint256 cost = mintPrice * addresses.length;
         NALNDA.transferFrom(_msgSender(), address(this), cost);
         uint256 protocolPayout = (cost * protocolMintFee) / 100;
-        //send commission to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        //send commission to masterContract
+        NALNDA.transfer(address(masterContract), protocolPayout);
         uint256 afterProtocolPayout = mintPrice - protocolPayout;
         uint256 ownerShare = (afterProtocolPayout * 70) / 100;
         totalDOCommissions += (afterProtocolPayout * 30) / 100; //remaining 30 % will go to DOs
@@ -389,9 +395,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         );
         require(
             block.timestamp >=
-                ownedAt[tokenId] +
-                    marketplaceContract.transferAfterDays() *
-                    1 days,
+                ownedAt[tokenId] + masterContract.transferAfterDays() * 1 days,
             "NalndaITOBook: Transfer not allowed!"
         );
         _chargeTransferFees(tokenId);
@@ -407,7 +411,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         NALNDA.transferFrom(_msgSender(), address(this), totalFee);
         //send protocol its share
         uint256 protocolPayout = (lastSellPrice * protocolTransferFee) / 100;
-        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        NALNDA.transfer(address(masterContract), protocolPayout);
         //send owner share to the book owner
         // uint256 ownerShare = (lastSellPrice * transfersBookOwnerShare) / 100;
         uint256 afterProtocolPayout = totalFee - protocolPayout;
@@ -428,9 +432,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         );
         require(
             block.timestamp >=
-                ownedAt[tokenId] +
-                    marketplaceContract.transferAfterDays() *
-                    1 days,
+                ownedAt[tokenId] + masterContract.transferAfterDays() * 1 days,
             "NalndaITOBook: Transfer not allowed!"
         );
         _chargeTransferFees(tokenId);
