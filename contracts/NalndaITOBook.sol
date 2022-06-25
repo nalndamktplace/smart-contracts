@@ -117,7 +117,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         mintPrice = _initialPrice;
     }
 
-    address[] public approvedForITO;
+    // address[] public approvedForITO;
     mapping(address => bool) public addressApprovedForITO;
     mapping(address => bool) public claimed;
 
@@ -130,7 +130,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
             "NalndaITOBook: ITO already started/ended!"
         );
         currentITOStage = ITOStage.STARTED;
-        approvedForITO = _approvedAddresses;
+        // approvedForITO = _approvedAddresses;
         for (uint256 i = 0; i < _approvedAddresses.length; i++) {
             addressApprovedForITO[_approvedAddresses[i]] = true;
         }
@@ -146,7 +146,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
             "NalndaITOBook: ITO not started/ended!"
         );
         for (uint256 i = 0; i < _approvedAddresses.length; i++) {
-            approvedForITO.push(_approvedAddresses[i]);
+            // approvedForITO.push(_approvedAddresses[i]);
             addressApprovedForITO[_approvedAddresses[i]] = true;
         }
     }
@@ -162,7 +162,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         );
         require(
             claimed[_msgSender()] == false,
-            "NalndaITOBook: You can only mint once during ITO!"
+            "NalndaITOBook: You can only mint one time during ITO!"
         );
         claimed[_msgSender()] = true; //prevents reentrancy
         //transfer the minting cost to the contract
@@ -192,7 +192,7 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     address[] public DistributedOwners;
 
     // Ideally sales and transfers sould start after fixed number of tokens are minted,
-    // but in case it does not happen marketplace admin can start them manually
+    // but in case it does not happen master admin can start them manually
     function startSalesTransfersManually() external onlyMaster {
         require(
             currentITOStage == ITOStage.STARTED,
@@ -225,9 +225,9 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 startNormalSalesTransfers == true,
             "NalndaITOBook: Either the ITO should be going on or normal sales and transfers should be going on!"
         );
-        secondarySalesTimestamp = 2**256 - 1;
         currentITOStage = ITOStage.ENDED;
         startNormalSalesTransfers = false;
+        secondarySalesTimestamp = 2**256 - 1;
     }
 
     function changeMintPrice(uint256 _newPrice) external onlyOwner {

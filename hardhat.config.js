@@ -51,6 +51,9 @@ module.exports = {
 			blockGasLimit: 0x1fffffffffffff,
 			allowUnlimitedContractSize: true,
 			timeout: 1800000,
+			accounts: {
+				count: 3000
+			}
 		},
 	}
 };
