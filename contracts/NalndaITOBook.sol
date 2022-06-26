@@ -456,10 +456,14 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
         lastSoldPrice[_tokenId] = _price;
     }
 
-    function burn(uint256 tokenId) public virtual override {
+    function burn(uint256 tokenId)
+        public
+        virtual
+        override
+        salesAndTransfersStarted
+    {
         require(
-            currentITOStage == ITOStage.ENDED &&
-                startNormalSalesTransfers == false,
+            currentITOStage == ITOStage.ENDED,
             "NalndaITOBook: Can't burn during ITO phase!"
         );
         //solhint-disable-next-line max-line-length

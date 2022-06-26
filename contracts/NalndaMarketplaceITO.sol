@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.15;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "./interfaces/INalndaITOBook.sol";
@@ -175,10 +174,7 @@ contract NalndaMarketplaceITO is Context {
         uint256 remaining = (ORDER[_orderId].price * 10) / 100; //remaining 10%
         //send author commision
         uint256 authorShare = (remaining * 70) / 100; //70% of 10% to the book owner
-        NALNDA.transfer(
-            Ownable(address(ORDER[_orderId].book)).owner(),
-            authorShare
-        );
+        NALNDA.transfer(ORDER[_orderId].book.owner(), authorShare);
         uint256 DOCommissions = (remaining * 30) / 100; //30% of 10% to the DOs
         NALNDA.transfer(address(ORDER[_orderId].book), DOCommissions);
         //update DOCommissions

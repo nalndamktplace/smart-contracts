@@ -34,4 +34,6 @@ interface INalndaITOBook is IERC721 {
     function stopSalesTransfers() external;
 
     function increaseTotalDOCommissions(uint256 _increaseBy) external;
+
+    function owner() external view returns (address);
 }
