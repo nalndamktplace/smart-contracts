@@ -209,7 +209,7 @@ describe("ITO tests", function () {
             } catch (err) {
                 console.log(err);
             }
-            expect(await master.totalBooksCreated()).to.equal(BigNumber.from("2"));
+            // expect(await master.totalBooksCreated()).to.equal(BigNumber.from("2"));
             anotherBook = await master.authorToBooks(bhuvan.address, BigNumber.from("0"));
             const NalndaITOBook = await ethers.getContractFactory("NalndaITOBook");
             another_nalnda_book = await NalndaITOBook.attach(anotherBook);
@@ -393,165 +393,146 @@ describe("ITO tests", function () {
             expect(await nalnda_book.ownedAt(BigNumber.from("502"))).to.equal(BigNumber.from("0"));
         })
     })
-    let newBook1;
     describe('Secondary sales tests: listCover(), unlistCover(), buyCover()', () => {
-        it("listCover(): should revert if there are no covers minted yet", async () => {
-            // try{
-            //     await nalnda_erc20.connect(ekta).mint(ethers.utils.parseEther("100"));
-            //     await nalnda_erc20.connect(ekta).approve(nalnda_book.address, ethers.utils.parseEther("100"));
-            //     await nalnda_book.connect().
-            // }catch(err){
-            //     console.log(err);
-            // }
-            // // console.log(await nalnda_book.ownerOf(BigNumber.from("503")));
-            // console.log(await nalnda_book.balanceOf(BigNumber.from("503")));
-            //try to list book for 100 NALNDA
-            // await expect(marketplace.connect().listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Invalid tokenId provided!")
+        it("listCover(): should revert if wrong address is passed", async () => {
+            await expect(marketplace.listCover(ZERO_ADDR, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplaceITO: Invalid book address!")
         })
-        // it("listCover(): should revert if wrong address is passed", async () => {
-        //     await expect(marketplace.listCover(ZERO_ADDR, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Invalid book address!")
-        // })
-        // let order, lister, extraBal, nalnda_book;
-        // it("listCover(): should revert if lister does not own the NFT", async () => {
-        //     const NalndaBook = await ethers.getContractFactory("NalndaBook");
-        //     nalnda_book = await NalndaBook.attach(newBook1);
-        //     lister = ankit;
-        //     try {
-        //         //mint some NALNDA
-        //         await nalnda_erc20.connect(lister).mint(ethers.utils.parseEther("1000"));
-        //         //buy a cover to list
-        //         await nalnda_erc20.connect(lister).approve(nalnda_book.address, ethers.utils.parseEther("100"));
-        //         await nalnda_book.connect(lister).safeMint(lister.address);
-        //     } catch (err) {
-        //         console.log(err);
-        //     }
-        //     await expect(marketplace.listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Seller should own the NFT to list!")
-        // })
-        // it("listCover(): should revert if listing of book is disabled by owner. (Secondary sales between 3 - 5 months)", async () => {
-        //     await expect(marketplace.connect(lister).listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Listing for this book is disabled by the book owner!")
-        // })
-        // let newLister;
-        // it("listCover(): should revert if user tries to list book before 21 days of owning", async () => {
-        //     //increasing time
-        //     const days = 92 * 24 * 60 * 60;
-        //     await ethers.provider.send("evm_increaseTime", [days]);
-        //     await ethers.provider.send("evm_mine");
-        //     newLister = gagan;
-        //     await nalnda_erc20.connect(lister).approve(nalnda_book.address, ethers.utils.parseEther("100"));
-        //     await nalnda_book.connect(lister).transferFrom(lister.address, newLister.address, BigNumber.from("1"));
-        //     await expect(marketplace.connect(newLister).listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplace: Can't list the cover at this time!")
-        // })
-        // it("listCover(): should allow listing after 21 days of owning", async () => {
-        //     const days = 21 * 24 * 60 * 60;
-        //     await ethers.provider.send("evm_increaseTime", [days]);
-        //     await ethers.provider.send("evm_mine");
-        //     let oldLastId = await marketplace.lastOrderId();
-        //     await marketplace.connect(newLister).listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("150"));
-        //     // extraBal = await nalnda_erc20.balanceOf(newLister.address);
-        //     order = await marketplace.ORDER(BigNumber.from("1"));
-        //     let newLastId = await marketplace.lastOrderId();
-        //     expect(newLastId).to.above(oldLastId);
-        //     expect(newLastId).to.equal(BigNumber.from("1"));
-        //     //checking if NFT is moved from user's account to marketplace contract
-        //     expect(await nalnda_book.balanceOf(newLister.address)).to.equal(BigNumber.from("0"))
-        //     expect(await nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("1"))
-        //     expect(await nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(marketplace.address)
-        // })
-        // it("listCover(): ORDER mapping should be populated correctly", async () => {
-        //     expect(order.stage).to.equal(BigNumber.from("1"));//check stage
-        //     expect(order.orderId).to.equal(BigNumber.from("1"));//check order id
-        //     expect(order.seller).to.equal(newLister.address);//check seller
-        //     expect(order.book).to.equal(newBook1);//check book address
-        //     expect(order.tokenId).to.equal(BigNumber.from("1"));//check tokenId
-        //     expect(order.price).to.equal(ethers.utils.parseEther("150"));//check price
-        // })
-        // it("listCover(): ownedAt mapping should be updated correctly", async () => {
-        //     let ownedAtTime = await nalnda_book.ownedAt(BigNumber.from("1"));
-        //     const blockNum = await ethers.provider.getBlockNumber();
-        //     const block = await ethers.provider.getBlock(blockNum)
-        //     expect(ownedAtTime).to.equal(block.timestamp);
-        // })
-        // it("listCover(): Should revert if user tries to list NFT again", async () => {
-        //     await expect(marketplace.connect(newLister).listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("150"))).to.revertedWith("NalndaMarketplace: Seller should own the NFT to list!")
-        // })
-        // it("unlistCover(): Should revert if invalid order id is provided", async () => {
-        //     await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplace: Invalid order id!")
-        // })
-        // it("unlistCover(): Should revert if someone other than seller tries to unlist", async () => {
-        //     await expect(marketplace.connect(chitra).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: Only seller can unlist!")
-        // })
-        // it("unlistCover(): Seller should be able to unlist its cover", async () => {
-        //     try {
-        //         await marketplace.connect(newLister).unlistCover(BigNumber.from("1"))
-        //     } catch (err) {
-        //         console.log(err);
-        //     }
-        //     order = await marketplace.ORDER(BigNumber.from("1"));
-        //     //stage should be updated
-        //     expect(order.stage).to.equal(BigNumber.from("0"));
-        //     //checking if NFT is moved from marketplace to user's account
-        //     expect(await nalnda_book.balanceOf(newLister.address)).to.equal(BigNumber.from("1"))
-        //     expect(await nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("0"))
-        //     expect(await nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(newLister.address)
-        // })
+        it("listCover(): should revert if lister does not own the NFT", async () => {
+            await expect(marketplace.connect(bhuvan).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplaceITO: Seller should own the NFT to list!")
+        })
+        it("listCover(): should revert if listing of book is disabled by owner. (Secondary sales between 3 - 5 months)", async () => {
+            await expect(marketplace.connect(ankit).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplaceITO: Listing for this book is disabled!")
+        })
+        it("listCover(): should revert if invalid token id is provided", async () => {
+            await expect(marketplace.connect(ankit).listCover(another_nalnda_book.address, BigNumber.from("4"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplaceITO: Invalid tokenId provided!")
+        })
+        let newLister;
+        it("listCover(): should revert if user tries to list book before 21 days of owning", async () => {
+            //increasing time
+            const days = 92 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            newLister = gagan;
+            await nalnda_erc20.connect(ankit).mint(ethers.utils.parseEther("100"));
+            await nalnda_erc20.connect(ankit).approve(another_nalnda_book.address, ethers.utils.parseEther("100"));
+            await another_nalnda_book.connect(ankit).transferFrom(ankit.address, newLister.address, BigNumber.from("1"));
+            await expect(marketplace.connect(newLister).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("100"))).to.revertedWith("NalndaMarketplaceITO: Can't list the cover at this time!")
+        })
+        it("listCover(): should allow listing after 21 days of owning", async () => {
+            const days = 21 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            let oldLastId = await marketplace.lastOrderId();
+            await marketplace.connect(newLister).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("150"));
+            // extraBal = await nalnda_erc20.balanceOf(newLister.address);
+            order = await marketplace.ORDER(BigNumber.from("1"));
+            let newLastId = await marketplace.lastOrderId();
+            expect(newLastId).to.above(oldLastId);
+            expect(newLastId).to.equal(BigNumber.from("1"));
+            //checking if NFT is moved from user's account to marketplace contract
+            expect(await another_nalnda_book.balanceOf(newLister.address)).to.equal(BigNumber.from("0"))
+            expect(await another_nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("1"))
+            expect(await another_nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(marketplace.address)
+        })
+        it("listCover(): ORDER mapping should be populated correctly", async () => {
+            expect(order.stage).to.equal(BigNumber.from("1"));//check stage
+            expect(order.orderId).to.equal(BigNumber.from("1"));//check order id
+            expect(order.seller).to.equal(newLister.address);//check seller
+            expect(order.book).to.equal(another_nalnda_book.address);//check book address
+            expect(order.tokenId).to.equal(BigNumber.from("1"));//check tokenId
+            expect(order.price).to.equal(ethers.utils.parseEther("150"));//check price
+        })
+        it("listCover(): ownedAt mapping should be updated correctly", async () => {
+            let ownedAtTime = await another_nalnda_book.ownedAt(BigNumber.from("1"));
+            const blockNum = await ethers.provider.getBlockNumber();
+            const block = await ethers.provider.getBlock(blockNum)
+            expect(ownedAtTime).to.equal(block.timestamp);
+        })
+        it("listCover(): Should revert if user tries to list NFT again", async () => {
+            await expect(marketplace.connect(newLister).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("150"))).to.revertedWith("NalndaMarketplaceITO: Seller should own the NFT to list!")
+        })
+        it("unlistCover(): Should revert if invalid order id is provided", async () => {
+            await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplaceITO: Invalid order id!")
+        })
+        it("unlistCover(): Should revert if someone other than seller tries to unlist", async () => {
+            await expect(marketplace.connect(chitra).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplaceITO: Only seller or master admin can unlist!")
+        })
+        it("unlistCover(): Seller should be able to unlist its cover", async () => {
+            try {
+                await marketplace.connect(newLister).unlistCover(BigNumber.from("1"))
+            } catch (err) {
+                console.log(err);
+            }
+            order = await marketplace.ORDER(BigNumber.from("1"));
+            //stage should be updated
+            expect(order.stage).to.equal(BigNumber.from("0"));
+            //checking if NFT is moved from marketplace to user's account
+            expect(await another_nalnda_book.balanceOf(newLister.address)).to.equal(BigNumber.from("1"))
+            expect(await another_nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("0"))
+            expect(await another_nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(newLister.address)
+        })
         // it("unlistCover(): Should revert if the NFT is already sold", async () => {
-        //     await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplace: NFT not yet listed / already sold!")
+        //     await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplaceITO: NFT not yet listed / already sold!")
         //     order = await marketplace.ORDER(BigNumber.from("1"));
         // })
-        // it("unlistCover(): Stage should be set to UNLISTED", async () => {
-        //     expect(order.stage).to.equal(BigNumber.from("0"));
-        // })
-        // it("buyCover(): Should revert if invalid order id is provided", async () => {
-        //     await expect(marketplace.connect(newLister).buyCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplace: Invalid order id!")
-        // })
-        // let balBeforeMarket, balBefore, balBefCreator;
-        // it("buyCover(): Buyer should be able to buy a listed cover", async () => {
-        //     const days = 21 * 24 * 60 * 60;
-        //     await ethers.provider.send("evm_increaseTime", [days]);
-        //     await ethers.provider.send("evm_mine");
-        //     let buyer = daksh;
-        //     balBeforeMarket = await marketplace.getNALNDABalance();
-        //     balBefore = await nalnda_erc20.balanceOf(order.seller);
-        //     balBefCreator = await nalnda_erc20.balanceOf(bhuvan.address);
-        //     try {
-        //         await marketplace.connect(newLister).listCover(newBook1, BigNumber.from("1"), ethers.utils.parseEther("300"));
-        //         await nalnda_erc20.connect(buyer).mint(ethers.utils.parseEther("300"));
-        //         await nalnda_erc20.connect(buyer).approve(marketplace.address, ethers.utils.parseEther("300"));
-        //         await marketplace.connect(buyer).buyCover(BigNumber.from("2"));
-        //     } catch (err) {
-        //         console.log(err);
-        //     }
-        //     order = await marketplace.ORDER(BigNumber.from("2"));
-        //     //stage should be updated
-        //     expect(order.stage).to.equal(BigNumber.from("2"));
-        //     // checking if NFT is moved from marketplace to buyer's account
-        //     expect(await nalnda_book.balanceOf(buyer.address)).to.equal(BigNumber.from("1"))
-        //     expect(await nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("0"))
-        //     expect(await nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(buyer.address)
-        // })
-        // it("buyCover(): Should update the ownerAt mapping correctly", async () => {
-        //     let ownedAtTime = await nalnda_book.ownedAt(BigNumber.from("1"));
-        //     const blockNum = await ethers.provider.getBlockNumber();
-        //     const block = await ethers.provider.getBlock(blockNum)
-        //     expect(ownedAtTime).to.equal(block.timestamp);
-        // })
-        // it("buyCover(): Should update the lastSoldPrice mapping correctly", async () => {
-        //     expect(await nalnda_book.lastSoldPrice(BigNumber.from("1"))).to.equal(ethers.utils.parseEther("300"));
-        // })
-        // it("buyCover(): Should revert if a cover is already sold", async () => {
-        //     await expect(marketplace.connect(ekta).buyCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplace: NFT not yet listed / already sold!");
-        // })
-        // it("buyCover(): Should have sent correct amount of commissions to the seller, book owner and marketplace", async () => {
-        //     let balAfterMarket = await marketplace.getNALNDABalance();
-        //     let balAfter = await nalnda_erc20.balanceOf(order.seller)
-        //     let balAftCreator = await nalnda_erc20.balanceOf(bhuvan.address);
-        //     //fee collected test 2%
-        //     expect(balAfterMarket.sub(balBeforeMarket)).to.equal(ethers.utils.parseEther("6")) //6 = 2% of 300
-        //     //seller share test 88%
-        //     expect(balAfter.sub(balBefore)).to.equal(ethers.utils.parseEther("264")) //264 = 88% of 300
-        //     //book owner commission 10%
-        //     expect(balAftCreator.sub(balBefCreator)).to.equal(ethers.utils.parseEther("30")); //30 = 10% of 300
-        // })
+        it("unlistCover(): Stage should be set to UNLISTED", async () => {
+            expect(order.stage).to.equal(BigNumber.from("0"));
+        })
+        it("buyCover(): Should revert if invalid order id is provided", async () => {
+            await expect(marketplace.connect(newLister).buyCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplaceITO: Invalid order id!")
+        })
+        let balBeforeMarket, balBefore, balBefCreator, balBefDO;
+        it("buyCover(): Buyer should be able to buy a listed cover", async () => {
+            const days = 21 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            let buyer = daksh;
+            balBeforeMarket = await master.getNALNDABalance();
+            balBefore = await nalnda_erc20.balanceOf(order.seller);
+            balBefCreator = await nalnda_erc20.balanceOf(bhuvan.address);
+            balBefDO = await nalnda_erc20.balanceOf(another_nalnda_book.address);
+            try {
+                await marketplace.connect(newLister).listCover(another_nalnda_book.address, BigNumber.from("1"), ethers.utils.parseEther("300"));
+                await nalnda_erc20.connect(buyer).mint(ethers.utils.parseEther("300"));
+                await nalnda_erc20.connect(buyer).approve(marketplace.address, ethers.utils.parseEther("300"));
+                await marketplace.connect(buyer).buyCover(BigNumber.from("2"));
+            } catch (err) {
+                console.log(err);
+            }
+            order = await marketplace.ORDER(BigNumber.from("2"));
+            //stage should be updated
+            expect(order.stage).to.equal(BigNumber.from("2"));
+            // checking if NFT is moved from marketplace to buyer's account
+            expect(await another_nalnda_book.balanceOf(buyer.address)).to.equal(BigNumber.from("1"))
+            expect(await another_nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("0"))
+            expect(await another_nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(buyer.address)
+        })
+        it("buyCover(): Should update the ownerAt mapping correctly", async () => {
+            let ownedAtTime = await another_nalnda_book.ownedAt(BigNumber.from("1"));
+            const blockNum = await ethers.provider.getBlockNumber();
+            const block = await ethers.provider.getBlock(blockNum)
+            expect(ownedAtTime).to.equal(block.timestamp);
+        })
+        it("buyCover(): Should update the lastSoldPrice mapping correctly", async () => {
+            expect(await another_nalnda_book.lastSoldPrice(BigNumber.from("1"))).to.equal(ethers.utils.parseEther("300"));
+        })
+        it("buyCover(): Should revert if a cover is already sold", async () => {
+            await expect(marketplace.connect(ekta).buyCover(BigNumber.from("2"))).to.revertedWith("NalndaMarketplaceITO: NFT not yet listed / already sold!");
+        })
+        it("Should have sent correct amount of commissions to the seller, book owner, master and DOs", async () => {
+            let balAfterMarket = await master.getNALNDABalance();
+            let balAfter = await nalnda_erc20.balanceOf(order.seller)
+            let balAftCreator = await nalnda_erc20.balanceOf(bhuvan.address);
+            let balAftDO = await nalnda_erc20.balanceOf(another_nalnda_book.address);
+            //fee collected test 2%
+            expect(balAfterMarket.sub(balBeforeMarket)).to.equal(ethers.utils.parseEther("6")) //6 = 2% of 300
+            //seller share test 88%
+            expect(balAfter.sub(balBefore)).to.equal(ethers.utils.parseEther("264")) //264 = 88% of 300
+            //book owner commission 70% of remaining 10%
+            expect(balAftCreator.sub(balBefCreator)).to.equal(ethers.utils.parseEther("21")); //21 = 70% of 10% of 300
+            //DOs should get 30% of remaining 10%
+            expect(balAftDO.sub(balBefDO)).to.equal(ethers.utils.parseEther("9")); //9 = 30% of 10% of 300
+        })
         // it("withdrawRevenue(): should revery in case some other account than the owner calls it", async () => {
         //     await expect(marketplace.connect(bhuvan).withdrawRevenue()).to.revertedWith("Ownable: caller is not the owner")
         // })
