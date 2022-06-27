@@ -479,4 +479,8 @@ contract NalndaITOBook is ERC721, Pausable, ERC721Burnable, Ownable {
     function renounceOwnership() public virtual override onlyOwner {
         revert("NalndaITOBook: Ownership of a book cannot be renounced!");
     }
+
+    function getNALNDABalance() public view returns (uint256 bal) {
+        bal = NALNDA.balanceOf((address(this)));
+    }
 }

@@ -25,7 +25,7 @@ describe("ITO tests", function () {
             owner,
             ankit, bhuvan, chitra, daksh, ekta, fateh, gagan, hari, isha,
             jatin, kritika, lohit, mahesh,
-            A, B, C, D, E, USDAO_whale] = accounts;
+            A, B, C, D, E] = accounts;
         await deployContracts();
     })
     let newBook;
@@ -392,6 +392,27 @@ describe("ITO tests", function () {
         it("burn(): Should have set the ownedAt timestamp to 0", async () => {
             expect(await nalnda_book.ownedAt(BigNumber.from("502"))).to.equal(BigNumber.from("0"));
         })
+        it("renounceOwnership() for a book: Should revert", async () => {
+            await expect(nalnda_book.connect(ankit).renounceOwnership()).to.revertedWith("Ownership of a book cannot be renounced!")
+        })
+        it("stopSalesTransfersITO(): Should revert if someone other than owner tries to call", async () => {
+            let arg = []
+            arg.push(nalnda_book.address);
+            await expect(master.connect(ankit).stopSalesTransfersITO(arg)).to.revertedWith("Ownable: caller is not the owner")
+        })
+        it("stopSalesTransfersITO(): Master admin/owner should be able to stop sales and transfers for a particular book", async () => {
+            let arg = []
+            arg.push(nalnda_book.address);
+            try {
+                await master.connect(owner).stopSalesTransfersITO(arg);
+            } catch (err) {
+                console.log(err);
+            }
+            await expect(nalnda_book.connect(ankit).safeMint(ankit.address)).to.revertedWith("NalndaITOBook: Sales and transfers not started yet/already stopped!")
+            expect(await nalnda_book.startNormalSalesTransfers()).to.equal(false);
+            expect(await nalnda_book.secondarySalesTimestamp()).to.equal(MAX_UINT);
+            expect(await nalnda_book.currentITOStage()).to.equal(BigNumber.from("2"));
+        })
     })
     describe('Secondary sales tests: listCover(), unlistCover(), buyCover()', () => {
         it("listCover(): should revert if wrong address is passed", async () => {
@@ -471,10 +492,10 @@ describe("ITO tests", function () {
             expect(await another_nalnda_book.balanceOf(marketplace.address)).to.equal(BigNumber.from("0"))
             expect(await another_nalnda_book.ownerOf(BigNumber.from("1"))).to.equal(newLister.address)
         })
-        // it("unlistCover(): Should revert if the NFT is already sold", async () => {
-        //     await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplaceITO: NFT not yet listed / already sold!")
-        //     order = await marketplace.ORDER(BigNumber.from("1"));
-        // })
+        it("unlistCover(): Should revert if the NFT is already sold", async () => {
+            await expect(marketplace.connect(newLister).unlistCover(BigNumber.from("1"))).to.revertedWith("NalndaMarketplaceITO: NFT not yet listed / already sold!")
+            order = await marketplace.ORDER(BigNumber.from("1"));
+        })
         it("unlistCover(): Stage should be set to UNLISTED", async () => {
             expect(order.stage).to.equal(BigNumber.from("0"));
         })
@@ -533,23 +554,206 @@ describe("ITO tests", function () {
             //DOs should get 30% of remaining 10%
             expect(balAftDO.sub(balBefDO)).to.equal(ethers.utils.parseEther("9")); //9 = 30% of 10% of 300
         })
-        // it("withdrawRevenue(): should revery in case some other account than the owner calls it", async () => {
-        //     await expect(marketplace.connect(bhuvan).withdrawRevenue()).to.revertedWith("Ownable: caller is not the owner")
-        // })
-        // it("withdrawRevenue(): owner should be able to withdraw its revenue", async () => {
-        //     balBeforeMarket = await marketplace.getNALNDABalance()
-        //     try {
-        //         await marketplace.connect(owner).withdrawRevenue();
-        //     } catch (err) {
-        //         console.log(err);
-        //     }
-        //     let balAfterMarket = await marketplace.getNALNDABalance()
-        //     expect(balAfterMarket).to.equal(BigNumber.from("0"));
-        //     let balNow = await nalnda_erc20.balanceOf(owner.address);
-        //     expect(balNow).to.equal(balBeforeMarket);
-        // })
-        // it("renounceOwnership() for a book: Should revert", async () => {
-        //     await expect(nalnda_book.connect(bhuvan).renounceOwnership()).to.revertedWith("Ownership of a book cannot be renounced!")
-        // })
+    })
+    describe("Distributed Owners revenue tests", () => {
+        let book;
+        it("DOCommission(): Every DOs should have equal distribution after primary and secondary sales", async () => {
+            await deployContracts();
+            try {
+                await master.connect(ankit).createNewITOBook(ankit.address, BigNumber.from("500"), "test_uri", ethers.utils.parseEther("100"), BigNumber.from("92"), BigNumber.from("20"), ['1', '3']);
+            } catch (err) {
+                console.log(err);
+            }
+            let bookAddr = await master.authorToBooks(ankit.address, BigNumber.from("0"));
+            const NalndaITOBook = await ethers.getContractFactory("NalndaITOBook");
+            book = await NalndaITOBook.attach(bookAddr);
+            let approved = [];
+            for (let i = 2; i < 100; i++)
+                approved.push(accounts[i].address);
+            try {
+                await master.connect(owner).approveBookStartITO(book.address, approved);
+                for (let i = 2; i < 12; i++) {
+                    await nalnda_erc20.connect(accounts[i]).mint(ethers.utils.parseEther("100"));
+                    await nalnda_erc20.connect(accounts[i]).approve(book.address, ethers.utils.parseEther("100"));
+                    await book.connect(accounts[i]).safeMintITO();
+                }
+                await master.connect(owner).startSalesTransfersManuallyITO(book.address);
+            } catch (err) {
+                console.log(err);
+            }
+            expect(await book.totalDOs()).to.equal(BigNumber.from("10"));
+            expect(await book.currentITOStage()).to.equal(BigNumber.from("2")); //ITO should be ended
+            expect(await book.startNormalSalesTransfers()).to.equal(true);
+            expect(await book.secondarySalesTimestamp()).to.not.equal(MAX_UINT);
+            //some primary sales
+            try {
+                for (let i = 101; i < 111; i++) {
+                    await nalnda_erc20.connect(accounts[i]).mint(ethers.utils.parseEther("100"));
+                    await nalnda_erc20.connect(accounts[i]).approve(book.address, ethers.utils.parseEther("100"));
+                    await book.connect(accounts[i]).safeMint(accounts[i].address);
+                }
+            } catch (err) {
+                console.log(err);
+            }
+            let expectedTotal = BigNumber.from("0");
+            for (let i = 2; i < 12; i++) {
+                expectedTotal = expectedTotal.add(await book.DOCommission(accounts[i].address));
+            }
+            expect(expectedTotal).to.equal(await book.totalDOCommissions());
+            expect(expectedTotal).to.equal(await nalnda_erc20.balanceOf(book.address));
+            for (let i = 2; i < 12; i++) {
+                expect(await book.DOCommission(accounts[i].address)).to.equal(((await nalnda_erc20.balanceOf(book.address)).div(BigNumber.from(10))));
+            }
+            //increasing time
+            const days = 92 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            let j = BigNumber.from("11")
+            //some secondary sales
+            try {
+                for (let i = 101; i < 111; i++, j = j.add(BigNumber.from("1"))) {
+                    await marketplace.connect(accounts[i]).listCover(book.address, j, ethers.utils.parseEther("200"));
+                }
+            } catch (err) {
+                console.log(err);
+            }
+            j = BigNumber.from("1");
+            try {
+                for (let i = 111; i < 121; i++, j = j.add(BigNumber.from("1"))) {
+                    await nalnda_erc20.connect(accounts[i]).mint(ethers.utils.parseEther("200"));
+                    await nalnda_erc20.connect(accounts[i]).approve(marketplace.address, ethers.utils.parseEther("200"));
+                    await marketplace.connect(accounts[i]).buyCover(j);
+                }
+            } catch (err) {
+                console.log(err);
+            }
+            for (let i = 2; i < 12; i++) {
+                expect(await book.DOCommission(accounts[i].address)).to.equal(((await nalnda_erc20.balanceOf(book.address)).div(BigNumber.from(10))));
+            }
+        })
+        it("withdrawDOCommission(): Is 2 DOs withdraw their commission the other 8 should still have equal amount of commission distribution", async () => {
+            let bef1, bef2;
+            try {
+                bef1 = await book.DOCommission(accounts[2].address);
+                await book.connect(accounts[2]).withdrawDOCommission();
+                bef2 = await book.DOCommission(accounts[3].address);
+                await book.connect(accounts[3]).withdrawDOCommission();
+            } catch (err) {
+                console.log(err);
+            }
+            expect(await book.DOCommission(accounts[2].address)).to.equal(BigNumber.from("0"))
+            expect(await book.DOCommission(accounts[2].address)).to.below(bef1)
+            expect(await book.DOCommission(accounts[3].address)).to.equal(BigNumber.from("0"))
+            expect(await book.DOCommission(accounts[3].address)).to.below(bef2)
+            for (let i = 4; i < 12; i++) {
+                expect(await book.DOCommission(accounts[i].address)).to.equal(((await book.totalDOCommissions()).div(BigNumber.from(10))));
+            }
+        })
+        let buyer;
+        it("DOCommission(): After some more primary and secondary sales the 2 accounts already withdrawn should have some commission gain of the extra amount from sales", async () => {
+            let newUser = accounts[500];
+            buyer = accounts[501];
+            let bef1 = await book.DOCommission(accounts[2].address)
+            let bef2 = await book.DOCommission(accounts[5].address)
+            //primary sale
+            try {
+                await nalnda_erc20.connect(newUser).mint(ethers.utils.parseEther("100"));
+                await nalnda_erc20.connect(newUser).approve(book.address, ethers.utils.parseEther("100"));
+                await book.connect(newUser).safeMint(newUser.address);
+            } catch (err) {
+                console.log(err);
+            }
+            let gained = (ethers.utils.parseEther("90")).mul(BigNumber.from("30")).div(BigNumber.from("100"));
+            let gainedPerUser = gained.div(BigNumber.from("10"));
+            let aft1 = await book.DOCommission(accounts[2].address);
+            let aft2 = await book.DOCommission(accounts[5].address);
+            expect(gainedPerUser).to.equal(aft1.sub(bef1))
+            expect(gainedPerUser).to.equal(aft2.sub(bef2))
+            expect(await book.DOCommission(accounts[2].address)).to.above(BigNumber.from("0"));
+            expect(await book.DOCommission(accounts[3].address)).to.above(BigNumber.from("0"));
+            for (let i = 4; i < 12; i++) {
+                expect(await book.DOCommission(accounts[2].address)).to.below(await book.DOCommission(accounts[i].address));
+                expect(await book.DOCommission(accounts[3].address)).to.below(await book.DOCommission(accounts[i].address));
+            }
+            bef1 = await book.DOCommission(accounts[2].address)
+            bef2 = await book.DOCommission(accounts[5].address)
+            //increasing time
+            const days = 21 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            // secondary sale
+            try {
+                await marketplace.connect(newUser).listCover(book.address, BigNumber.from("21"), ethers.utils.parseEther("300"));
+                await nalnda_erc20.connect(buyer).mint(ethers.utils.parseEther("300"));
+                await nalnda_erc20.connect(buyer).approve(marketplace.address, ethers.utils.parseEther("300"));
+                await marketplace.connect(buyer).buyCover(await marketplace.lastOrderId())
+            } catch (err) {
+                console.log(err);
+            }
+            gained = (ethers.utils.parseEther("30")).mul(BigNumber.from("30")).div(BigNumber.from("100"));
+            gainedPerUser = gained.div(BigNumber.from("10"));
+            aft1 = await book.DOCommission(accounts[2].address);
+            aft2 = await book.DOCommission(accounts[5].address);
+            expect(gainedPerUser).to.equal(aft1.sub(bef1))
+            expect(gainedPerUser).to.equal(aft2.sub(bef2))
+        })
+        it("DOCommission(): Transfer of NFT should have sent some NALNDA as commission to the DOs", async () => {
+            let bef1 = await book.DOCommission(accounts[2].address)
+            let bef2 = await book.DOCommission(accounts[5].address)
+            //increasing time
+            const days = 21 * 24 * 60 * 60;
+            await ethers.provider.send("evm_increaseTime", [days]);
+            await ethers.provider.send("evm_mine");
+            try {
+                await nalnda_erc20.connect(buyer).mint(ethers.utils.parseEther("100"));
+                await nalnda_erc20.connect(buyer).approve(book.address, ethers.utils.parseEther("100"));
+                await book.connect(buyer).transferFrom(buyer.address, accounts[350].address, await book.coverIdCounter());
+            } catch (err) {
+                console.log(err);
+            }
+            let gained = (ethers.utils.parseEther("30")).mul(BigNumber.from("30")).div(BigNumber.from("100"));
+            let gainedPerUser = gained.div(BigNumber.from("10"));
+            aft1 = await book.DOCommission(accounts[2].address);
+            aft2 = await book.DOCommission(accounts[5].address);
+            expect(gainedPerUser).to.equal(aft1.sub(bef1))
+            expect(gainedPerUser).to.equal(aft2.sub(bef2))
+        })
+        it("withdrawDOCommission(): All DOs should be able to withdraw their commissions and that should empty the contract (which holds DO commissions)", async () => {
+            let bef = await book.getNALNDABalance();
+            try {
+                for (let i = 2; i < 12; i++) {
+                    await book.connect(accounts[i]).withdrawDOCommission();
+                }
+            } catch (err) {
+                console.log(err);
+            }
+            expect(await book.getNALNDABalance()).to.equal(BigNumber.from("0"));
+            expect(await book.getNALNDABalance()).to.below(bef);
+            for (let i = 2; i < 12; i++) {
+                expect(await book.connect(accounts[i]).DOCommission(accounts[i].address)).to.equal(BigNumber.from("0"))
+            }
+        })
+        it("withdrawDOCommission(): Should revert if their is no commissions to claim by the DOs", async () => {
+            for (let i = 2; i < 12; i++) {
+                await expect(book.connect(accounts[i]).withdrawDOCommission()).to.revertedWith("NalndaITOBook: No more commissions to withdraw!");
+            }
+        })
+    })
+    describe("Master contract revenue tests:", () => {
+        it("withdrawRevenue(): should revery in case some other account than the owner calls it", async () => {
+            await expect(master.connect(bhuvan).withdrawRevenue()).to.revertedWith("Ownable: caller is not the owner")
+        })
+        it("withdrawRevenue(): owner should be able to withdraw its revenue", async () => {
+            let balBeforeMaster = await master.getNALNDABalance()
+            try {
+                await master.connect(owner).withdrawRevenue();
+            } catch (err) {
+                console.log(err);
+            }
+            let balAfterMaster = await master.getNALNDABalance()
+            expect(balAfterMaster).to.equal(BigNumber.from("0"));
+            let balNow = await nalnda_erc20.balanceOf(owner.address);
+            expect(balNow).to.equal(balBeforeMaster);
+        })
     })
 })

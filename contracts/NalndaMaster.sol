@@ -104,8 +104,6 @@ contract NalndaMaster is NalndaMasterBase, Ownable {
         }
     }
 
-    // Normal Books
-
     function withdrawRevenue() external onlyOwner {
         uint256 balance = getNALNDABalance();
         require(balance != 0, "NalndaMaster: Nothing to withdraw!");
