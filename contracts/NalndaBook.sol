@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.14;
+pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -20,8 +20,9 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     uint256 public immutable protocolMintFee;
     uint256 public immutable protocolFee;
     uint256 public immutable bookOwnerShare;
-    uint256 public immutable creationTimestamp;
-    uint256 public immutable secondarySalesTimestamp;
+    bool public approved;
+    uint256 public immutable daysForSecondarySales;
+    uint256 public secondarySalesTimestamp;
     uint256 public immutable bookLang;
     uint256[] public bookGenre;
     string public uri;
@@ -35,6 +36,14 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     modifier onlyMarketplace() {
         require(_msgSender() == address(marketplaceContract));
+        _;
+    }
+
+    modifier marketplaceApproved() {
+        require(
+            approved == true,
+            "NalndaBook: Book unapproved from marketplace!"
+        );
         _;
     }
 
@@ -71,21 +80,33 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
                 _genre[i] >= 0 && _genre[i] < 100,
                 "NalndaBook: Book genre tag should be between 1 and 60!"
             );
-        creationTimestamp = block.timestamp;
+        approved = false;
+        daysForSecondarySales = _daysForSecondarySales;
+        secondarySalesTimestamp = 2**256 - 1;
         bookLang = _lang;
         bookGenre = _genre;
-        secondarySalesTimestamp =
-            block.timestamp +
-            _daysForSecondarySales *
-            1 days;
         marketplaceContract = INalndaMarketplace(_msgSender());
         transferOwnership(_author);
-        protocolMintFee = marketplaceContract.protocolMintFee();
+        protocolMintFee = 10; //10% on safemint
         protocolFee = 2; //2% on every transfer
         bookOwnerShare = 10; //10% on every transfer
         NALNDA = IERC20(marketplaceContract.NALNDA());
         uri = string(_uri);
         mintPrice = _initialPrice;
+    }
+
+    function changeApproval(bool _newApproved) external onlyMarketplace {
+        if (_newApproved == true) {
+            require(approved == false, "NalndaBook: Already approved!");
+            secondarySalesTimestamp =
+                block.timestamp +
+                daysForSecondarySales *
+                1 days;
+        } else {
+            require(approved == true, "NalndaBook: Already unapproved!");
+            secondarySalesTimestamp = 2**256 - 1;
+        }
+        approved = _newApproved;
     }
 
     function changeMintPrice(uint256 _newPrice) external onlyOwner {
@@ -115,7 +136,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     }
 
     //owner should be able to mint for free at any point
-    function ownerMint(address to) external onlyOwner {
+    function ownerMint(address to) external onlyOwner marketplaceApproved {
         coverIdCounter.increment();
         uint256 tokenId = coverIdCounter.current();
         ownedAt[tokenId] = block.timestamp;
@@ -126,14 +147,31 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         } else _safeMint(owner(), tokenId);
     }
 
+    function batchOwnerMint(address[] memory addresses)
+        external
+        onlyOwner
+        marketplaceApproved
+    {
+        for (uint256 i = 0; i < addresses.length; i++) {
+            coverIdCounter.increment();
+            uint256 tokenId = coverIdCounter.current();
+            ownedAt[tokenId] = block.timestamp;
+            if (addresses[i] != owner()) {
+                //first mint for author then transfer
+                _safeMint(owner(), tokenId);
+                _transfer(owner(), addresses[i], tokenId);
+            } else _safeMint(owner(), tokenId);
+        }
+    }
+
     //public method for minting new cover
-    function safeMint(address to) external {
+    function safeMint(address to) external marketplaceApproved {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
         INalndaDiscount discount = INalndaDiscount(
             marketplaceContract.discountContract()
         );
-        uint256 commisionPayout;
+        uint256 protocolPayout;
         uint256 ownerShare;
         if (
             address(discount) != address(0) &&
@@ -141,18 +179,20 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         ) {
             uint256 discountPercent = discount.getDiscount(_msgSender());
             uint256 cashbackPayout = (mintPrice * discountPercent) / 100;
-            //send dicount cashback to buyer/minter
-            NALNDA.transfer(_msgSender(), cashbackPayout);
-            commisionPayout =
+            if (cashbackPayout != 0) {
+                //send dicount cashback to buyer/minter
+                NALNDA.transfer(_msgSender(), cashbackPayout);
+            }
+            protocolPayout =
                 (mintPrice * (protocolMintFee - discountPercent)) /
                 100;
-            ownerShare = mintPrice - commisionPayout - cashbackPayout;
+            ownerShare = mintPrice - protocolPayout - cashbackPayout;
         } else {
-            commisionPayout = (mintPrice * protocolMintFee) / 100;
-            ownerShare = mintPrice - commisionPayout;
+            protocolPayout = (mintPrice * protocolMintFee) / 100;
+            ownerShare = mintPrice - protocolPayout;
         }
         //send commision to marketplaceContract
-        NALNDA.transfer(address(marketplaceContract), commisionPayout);
+        NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner
         NALNDA.transfer(owner(), ownerShare);
         authorEarningsPaidout += ownerShare;
@@ -163,6 +203,50 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
+    }
+
+    function batchSafeMint(address[] memory addresses)
+        external
+        marketplaceApproved
+    {
+        //transfer the minting cost to the contract
+        uint256 cost = mintPrice * addresses.length;
+        NALNDA.transferFrom(_msgSender(), address(this), cost);
+        INalndaDiscount discount = INalndaDiscount(
+            marketplaceContract.discountContract()
+        );
+        uint256 protocolPayout;
+        uint256 ownerShare;
+        if (
+            address(discount) != address(0) &&
+            block.timestamp <= discount.expiry()
+        ) {
+            uint256 discountPercent = discount.getDiscount(_msgSender());
+            uint256 cashbackPayout = (cost * discountPercent) / 100;
+            if (cashbackPayout != 0) {
+                //send dicount cashback to buyer/minter
+                NALNDA.transfer(_msgSender(), cashbackPayout);
+            }
+            protocolPayout = (cost * (protocolMintFee - discountPercent)) / 100;
+            ownerShare = cost - protocolPayout - cashbackPayout;
+        } else {
+            protocolPayout = (cost * protocolMintFee) / 100;
+            ownerShare = cost - protocolPayout;
+        }
+        //send commision to marketplaceContract
+        NALNDA.transfer(address(marketplaceContract), protocolPayout);
+        //send author's share to the book owner
+        NALNDA.transfer(owner(), ownerShare);
+        authorEarningsPaidout += ownerShare;
+        for (uint256 i = 0; i < addresses.length; i++) {
+            coverIdCounter.increment();
+            uint256 _tokenId = coverIdCounter.current();
+            lastSoldPrice[_tokenId] = mintPrice;
+            ownedAt[_tokenId] = block.timestamp;
+            //first mint for author then transfer to buyer
+            _safeMint(owner(), _tokenId);
+            _transfer(owner(), addresses[i], _tokenId);
+        }
     }
 
     function _beforeTokenTransfer(
@@ -178,8 +262,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address to,
         uint256 tokenId,
         bytes memory data
-    ) public virtual override {
-        //conditions for commisions go here
+    ) public virtual override marketplaceApproved {
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: caller is not token owner nor approved"
@@ -214,7 +297,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         address from,
         address to,
         uint256 tokenId
-    ) public virtual override {
+    ) public virtual override marketplaceApproved {
         //solhint-disable-next-line max-line-length
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
@@ -260,6 +343,6 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     }
 
     function renounceOwnership() public virtual override onlyOwner {
-        revert("Ownership of a book cannot be renounced!");
+        revert("NalndaBook: Ownership of a book cannot be renounced!");
     }
 }

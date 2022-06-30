@@ -3,7 +3,7 @@ pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-interface INalndaBook is IERC721 {
+interface INalndaITOBook is IERC721 {
     function uri() external view;
 
     function coverIdCounter() external view returns (uint256);
@@ -22,7 +22,18 @@ interface INalndaBook is IERC721 {
 
     function lastSoldPrice(uint256 _tokenId) external view returns (uint256);
 
-    function approved() external view returns (bool);
+    function startNormalSalesTransfers() external view returns (bool);
 
-    function changeApproval(bool _newApproved) external;
+    function approveBookStartITO(address[] memory _approvedAddresses) external;
+
+    function addMoreApprovedAddresses(address[] memory _approvedAddresses)
+        external;
+
+    function startSalesTransfersManually() external;
+
+    function stopSalesTransfers() external;
+
+    function increaseTotalDOCommissions(uint256 _increaseBy) external;
+
+    function owner() external view returns (address);
 }

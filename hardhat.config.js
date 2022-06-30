@@ -21,11 +21,11 @@ module.exports = {
 	solidity: {
 		compilers: [
 			{
-				version: "0.8.14",
+				version: "0.8.15",
 				settings: {
 					optimizer: {
 						enabled: true,
-						runs: 500,
+						runs: 1,
 					},
 				},
 			},
@@ -51,6 +51,9 @@ module.exports = {
 			blockGasLimit: 0x1fffffffffffff,
 			allowUnlimitedContractSize: true,
 			timeout: 1800000,
+			accounts: {
+				count: 3000
+			}
 		},
 	}
 };
