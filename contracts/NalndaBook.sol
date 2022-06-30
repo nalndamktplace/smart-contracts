@@ -68,8 +68,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
             "NalndaBook: Marketplace address is not a contract!!!"
         );
         require(
-            _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
-            "NalndaBook: Days to secondary sales should be between 90 and 150!"
+            _daysForSecondarySales >= 1 && _daysForSecondarySales <= 150,
+            "NalndaBook: Days to secondary sales should be between 1 and 150!"
         );
         require(
             _lang >= 0 && _lang < 100,

@@ -46,8 +46,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        transferAfterDays = 21; //21 days
-        secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
+        transferAfterDays = 1; //1 day
+        secondarySaleAfterDays = 1; //user should have owned cover for atlease 1 day
         totalBooksCreated = 0;
         lastOrderId = 0;
         discountContract = INalndaDiscount(address(0));
@@ -82,8 +82,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: Empty string passed as cover URI!"
         );
         require(
-            _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
-            "NalndaMarketplace: Days to secondary sales should be between 90 and 150!"
+            _daysForSecondarySales >= 1 && _daysForSecondarySales <= 150,
+            "NalndaMarketplace: Days to secondary sales should be between 1 and 150!"
         );
         require(
             _lang >= 0 && _lang < 100,
