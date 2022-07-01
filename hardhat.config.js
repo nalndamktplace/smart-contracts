@@ -43,7 +43,7 @@ module.exports = {
 			accounts: [`${process.env.PRIVATE_KEY}`],
 		},
 		mumbai: {
-			url: `https://matic-mumbai.chainstacklabs.com`,
+			url: `${process.inv.ALCHEMY_API_URL}`,
 			accounts: [`${process.env.PRIVATE_KEY}`],
 		},
 		hardhat: {
