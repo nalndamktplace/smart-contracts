@@ -43,7 +43,7 @@ module.exports = {
 			accounts: [`${process.env.PRIVATE_KEY}`],
 		},
 		mumbai: {
-			url: `${process.inv.ALCHEMY_API_URL}`,
+			url: `${process.env.ALCHEMY_API_URL}`,
 			accounts: [`${process.env.PRIVATE_KEY}`],
 		},
 		hardhat: {
