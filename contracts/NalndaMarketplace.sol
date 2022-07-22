@@ -47,7 +47,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         );
         NALNDA = IERC20(_NALNDA);
         transferAfterDays = 1; //1 day
-        secondarySaleAfterDays = 1; //user should have owned cover for atlease 1 day
+        secondarySaleAfterDays = 0; //user should have owned cover for atlease 0 day
         totalBooksCreated = 0;
         lastOrderId = 0;
         discountContract = INalndaDiscount(address(0));
