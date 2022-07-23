@@ -160,15 +160,15 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             _book.ownerOf(_tokenId) == _msgSender(),
             "NalndaMarketplace: Seller should own the NFT to list!"
         );
-        require(
-            block.timestamp >= _book.secondarySalesTimestamp(),
-            "NalndaMarketplace: Listing for this book is disabled!"
-        );
-        require(
-            block.timestamp >=
-                _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
-            "NalndaMarketplace: Can't list the cover at this time!"
-        );
+        // require(
+        //     block.timestamp >= _book.secondarySalesTimestamp(),
+        //     "NalndaMarketplace: Listing for this book is disabled!"
+        // );
+        // require(
+        //     block.timestamp >=
+        //         _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
+        //     "NalndaMarketplace: Can't list the cover at this time!"
+        // );
         _book.marketplaceTransfer(_msgSender(), address(this), _tokenId);
         lastOrderId++;
         ORDER[lastOrderId] = Order(
