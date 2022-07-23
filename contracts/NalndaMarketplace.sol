@@ -46,7 +46,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             "NalndaMarketplace: NALNDA token's address can't be null!"
         );
         NALNDA = IERC20(_NALNDA);
-        transferAfterDays = 1; //1 day
+        transferAfterDays = 0; //0 day
         secondarySaleAfterDays = 0; //user should have owned cover for atlease 0 day
         totalBooksCreated = 0;
         lastOrderId = 0;
