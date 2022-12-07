@@ -21,18 +21,22 @@ module.exports = {
 	solidity: "0.8.13",
 	defaultNetwork: "hardhat",
 	networks: {
-		rinkeby: {
-			url: `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+		goerli: {
+			url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 			accounts: [`${process.env.PRIVATE_KEY}`],
-			gas: 3000000,
 		},
-		ropsten: {
-			url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+		sepolia: {
+			url: `https://sepolia.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
 			accounts: [`${process.env.PRIVATE_KEY}`],
 		},
 		mumbai: {
 			url: `https://matic-mumbai.chainstacklabs.com`,
 			accounts: [`${process.env.PRIVATE_KEY}`],
+		},
+		hedera: {
+			url: 'https://testnet.hashio.io/api',
+			chainId: 296,
+			accounts: [`${process.env.HEDERA_EVM_PVT_KEY}`],
 		},
 		hardhat: {
 			gas: 12000000,

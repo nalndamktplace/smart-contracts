@@ -9,6 +9,7 @@
     "hardhat": "^2.9.5"
   },
   "dependencies": {
+    "@hashgraph/sdk": "^2.19.0",
     "@openzeppelin/contracts": "^4.6.0",
     "dotenv": "^16.0.1"
   }
