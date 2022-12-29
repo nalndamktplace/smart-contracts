@@ -1,0 +1,64 @@
+
+
+  NalndaMarketplace tests
+deploying new contracts and initializing...
+done...
+    Creating new book:
+      1) createNewBook(): should revert if limited copies is negative
+{
+  event: [
+    '0x0000000000000000000000000000000000000000',
+    '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+    previousOwner: '0x0000000000000000000000000000000000000000',
+    newOwner: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'
+  ]
+}
+{
+  event: [
+    '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+    '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+    previousOwner: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+    newOwner: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+  ]
+}
+{
+  event: [
+    '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+    '0xCafac3dD18aC6c6e92c921884f9E4176737C052c',
+    'test_uri',
+    BigNumber { value: "100000000000000000000" },
+    BigNumber { value: "20" },
+    [ BigNumber { value: "1" }, BigNumber { value: "3" } ],
+    BigNumber { value: "1" },
+    _author: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+    _bookAddress: '0xCafac3dD18aC6c6e92c921884f9E4176737C052c',
+    _coverURI: 'test_uri',
+    _price: BigNumber { value: "100000000000000000000" },
+    _lang: BigNumber { value: "20" },
+    _genre: [ BigNumber { value: "1" }, BigNumber { value: "3" } ],
+    _limitedCopies: BigNumber { value: "1" }
+  ]
+}
+      ✔ createNewBook(): should be able to create a new book, with 1 covers prices at 100 NALNDA (85ms)
+    Primary sale/lazy mint, transfer fees and burn tests:
+      2) safeMint(): Anyone should be able to buy a cover by paying NALNDA
+
+
+  1 passing (8s)
+  2 failing
+
+  1) NalndaMarketplace tests
+       Creating new book:
+         createNewBook(): should revert if limited copies is negative:
+     AssertionError: Expected transaction to be reverted with NalndaMarketplace: Author address can't be null!, but other exception was thrown: Error: invalid address or ENS name (argument="name", value="<SignerWithAddress 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266>", code=INVALID_ARGUMENT, version=contracts/5.6.0)
+  
+
+  2) NalndaMarketplace tests
+       Primary sale/lazy mint, transfer fees and burn tests:
+         safeMint(): Anyone should be able to buy a cover by paying NALNDA:
+     TypeError: marketplace.bookAddress is not a function
+      at Context.<anonymous> (test/NewModel.test.js:231:41)
+      at processImmediate (node:internal/timers:466:21)
+
+
+
