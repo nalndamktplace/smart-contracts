@@ -6,5 +6,5 @@ interface INalndaMarketplace {
 
     function transferAfterDays() external view returns (uint256);
 
-    function discountContract() external view returns (address);
+    function owner() external view returns (address);
 }

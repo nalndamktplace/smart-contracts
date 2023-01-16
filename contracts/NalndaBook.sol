@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INalndaMarketplace.sol";
-import "./interfaces/INalndaDiscount.sol";
 
 contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
     using Counters for Counters.Counter;
@@ -164,33 +163,19 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         }
     }
 
+    function privateMint(address to) external marketplaceApproved {
+        require(
+            marketplaceContract.owner() == msg.sender,
+            "NalndaBook: Only owner of marketplace is allowed to do private minting!!!"
+        );
+    }
+
     //public method for minting new cover
     function safeMint(address to) external marketplaceApproved {
         //transfer the minting cost to the contract
         NALNDA.transferFrom(_msgSender(), address(this), mintPrice);
-        INalndaDiscount discount = INalndaDiscount(
-            marketplaceContract.discountContract()
-        );
-        uint256 protocolPayout;
-        uint256 ownerShare;
-        if (
-            address(discount) != address(0) &&
-            block.timestamp <= discount.expiry()
-        ) {
-            uint256 discountPercent = discount.getDiscount(_msgSender());
-            uint256 cashbackPayout = (mintPrice * discountPercent) / 100;
-            if (cashbackPayout != 0) {
-                //send dicount cashback to buyer/minter
-                NALNDA.transfer(_msgSender(), cashbackPayout);
-            }
-            protocolPayout =
-                (mintPrice * (protocolMintFee - discountPercent)) /
-                100;
-            ownerShare = mintPrice - protocolPayout - cashbackPayout;
-        } else {
-            protocolPayout = (mintPrice * protocolMintFee) / 100;
-            ownerShare = mintPrice - protocolPayout;
-        }
+        uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
+        uint256 ownerShare = mintPrice - protocolPayout;
         //send commision to marketplaceContract
         NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner
@@ -212,27 +197,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         //transfer the minting cost to the contract
         uint256 cost = mintPrice * addresses.length;
         NALNDA.transferFrom(_msgSender(), address(this), cost);
-        INalndaDiscount discount = INalndaDiscount(
-            marketplaceContract.discountContract()
-        );
-        uint256 protocolPayout;
-        uint256 ownerShare;
-        if (
-            address(discount) != address(0) &&
-            block.timestamp <= discount.expiry()
-        ) {
-            uint256 discountPercent = discount.getDiscount(_msgSender());
-            uint256 cashbackPayout = (cost * discountPercent) / 100;
-            if (cashbackPayout != 0) {
-                //send dicount cashback to buyer/minter
-                NALNDA.transfer(_msgSender(), cashbackPayout);
-            }
-            protocolPayout = (cost * (protocolMintFee - discountPercent)) / 100;
-            ownerShare = cost - protocolPayout - cashbackPayout;
-        } else {
-            protocolPayout = (cost * protocolMintFee) / 100;
-            ownerShare = cost - protocolPayout;
-        }
+        uint256 protocolPayout = (cost * protocolMintFee) / 100;
+        uint256 ownerShare = cost - protocolPayout;
         //send commision to marketplaceContract
         NALNDA.transfer(address(marketplaceContract), protocolPayout);
         //send author's share to the book owner

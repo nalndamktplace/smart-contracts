@@ -2,7 +2,6 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../interfaces/INalndaDiscount.sol";
 import "../interfaces/INalndaBook.sol";
 
 abstract contract NalndaMarketplaceBase {
@@ -17,8 +16,6 @@ abstract contract NalndaMarketplaceBase {
     uint256 public transferAfterDays;
 
     uint256 public secondarySaleAfterDays;
-
-    INalndaDiscount public discountContract;
 
     enum Stage {
         UNLISTED,
