@@ -163,11 +163,47 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         }
     }
 
-    function privateMint(address to) external marketplaceApproved {
+    // Owner of marketplace should be able to mint for free - for centralized payment solutions
+    function privateMint(
+        address to,
+        uint256 _mintPrice,
+        uint256 _authorEarningsPaidout
+    ) external marketplaceApproved {
+        address _marketplaceOwner = marketplaceContract.owner();
         require(
-            marketplaceContract.owner() == msg.sender,
+            _marketplaceOwner == _msgSender(),
             "NalndaBook: Only owner of marketplace is allowed to do private minting!!!"
         );
+        authorEarningsPaidout += _authorEarningsPaidout;
+        coverIdCounter.increment();
+        uint256 _tokenId = coverIdCounter.current();
+        lastSoldPrice[_tokenId] = _mintPrice;
+        ownedAt[_tokenId] = block.timestamp;
+        //first mint for marketplace owner then transfer to buyer
+        _safeMint(_marketplaceOwner, _tokenId);
+        _transfer(_marketplaceOwner, to, _tokenId);
+    }
+
+    function batchPrivateMint(
+        address[] memory addresses,
+        uint256 _mintPrice,
+        uint256 _authorEarningsPaidout
+    ) external marketplaceApproved {
+        address _marketplaceOwner = marketplaceContract.owner();
+        require(
+            _marketplaceOwner == _msgSender(),
+            "NalndaBook: Only owner of marketplace is allowed to do private minting!!!"
+        );
+        authorEarningsPaidout += _authorEarningsPaidout;
+        for (uint256 i = 0; i < addresses.length; i++) {
+            coverIdCounter.increment();
+            uint256 _tokenId = coverIdCounter.current();
+            lastSoldPrice[_tokenId] = _mintPrice;
+            ownedAt[_tokenId] = block.timestamp;
+            //first mint for marketplace owner then transfer to buyer
+            _safeMint(_marketplaceOwner, _tokenId);
+            _transfer(_marketplaceOwner, addresses[i], _tokenId);
+        }
     }
 
     //public method for minting new cover
