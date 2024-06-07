@@ -21,7 +21,7 @@ module.exports = {
   solidity: {
     compilers: [
       {
-        version: "0.8.15",
+        version: "0.8.25",
         settings: {
           optimizer: {
             enabled: true,
@@ -33,17 +33,8 @@ module.exports = {
   },
   defaultNetwork: "hardhat",
   networks: {
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: [`${process.env.PRIVATE_KEY}`],
-      gas: 3000000,
-    },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: [`${process.env.PRIVATE_KEY}`],
-    },
-    mumbai: {
-      url: `https://matic-mumbai.chainstacklabs.com`,
+    amoy: {
+      url: `https://rpc-amoy.polygon.technology`,
       accounts: [`${process.env.PRIVATE_KEY}`],
     },
     bsc_testnet: {

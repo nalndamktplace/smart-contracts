@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./NalndaBook.sol";
 import "./interfaces/INalndaBook.sol";
 import "./interfaces/INalndaDiscount.sol";
@@ -65,6 +66,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         for (uint256 i = 0; i < _genre.length; i++) {
             require(_genre[i] >= 0 && _genre[i] < 100, "NalndaMarketplace: Book genre tag should be between 1 and 60!");
         }
+
+        //TODO: add ERC1967Proxy here
         address _addressOutput =
             address(new NalndaBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre));
         authorToBooks[_msgSender()].push(_addressOutput);

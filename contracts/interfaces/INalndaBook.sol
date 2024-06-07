@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
@@ -10,11 +10,7 @@ interface INalndaBook is IERC721 {
 
     function updateLastSoldPrice(uint256 _tokenId, uint256 _price) external;
 
-    function marketplaceTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external;
+    function marketplaceTransfer(address from, address to, uint256 tokenId) external;
 
     function secondarySalesTimestamp() external view returns (uint256);
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -8,22 +8,24 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/INalndaMarketplace.sol";
 import "./interfaces/INalndaDiscount.sol";
 
-contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
+contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable, UUPSUpgradeable {
     using Counters for Counters.Counter;
 
     Counters.Counter public coverIdCounter;
-    IERC20 public immutable NALNDA;
-    INalndaMarketplace public immutable marketplaceContract;
-    uint256 public immutable protocolMintFee;
-    uint256 public immutable protocolFee;
-    uint256 public immutable bookOwnerShare;
+    IERC20 public NALNDA;
+    INalndaMarketplace public marketplaceContract;
+    uint256 public protocolMintFee;
+    uint256 public protocolFee;
+    uint256 public bookOwnerShare;
     bool public approved;
-    uint256 public immutable daysForSecondarySales;
+    uint256 public daysForSecondarySales;
     uint256 public secondarySalesTimestamp;
-    uint256 public immutable bookLang;
+    uint256 public bookLang;
     uint256[] public bookGenre;
     string public uri;
     uint256 public mintPrice;
@@ -44,14 +46,18 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
         _;
     }
 
-    constructor(
+    constructor() ERC721("NalndaBookCover", "COVER") {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _author,
         string memory _uri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256[] memory _genre
-    ) ERC721("NalndaBookCover", "COVER") {
+    ) public virtual initializer {
         require(_author != address(0), "NalndaBook: Author's address can't be null!");
         require(bytes(_uri).length > 0, "NalndaBook: Empty string passed as cover URI!!!");
         require(Address.isContract(_msgSender()) == true, "NalndaBook: Marketplace address is not a contract!!!");
@@ -269,5 +275,9 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable {
 
     function renounceOwnership() public virtual override onlyOwner {
         revert("NalndaBook: Ownership of a book cannot be renounced!");
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+        (newImplementation);
     }
 }

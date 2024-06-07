@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./NalndaITOBook.sol";
 import "./NalndaMarketplaceITO.sol";
-import "./interfaces/INalndaITOBook.sol";
-import "./Dependencies/NalndaMasterBase.sol";
+import "../interfaces/INalndaITOBook.sol";
+import "../Dependencies/NalndaMasterBase.sol";
 
 contract NalndaMaster is NalndaMasterBase, Ownable {
     event RevenueWithdrawn(uint256 _revenueWithdrawn);
 
     constructor(address _NALNDA) {
-        require(
-            _NALNDA != address(0),
-            "NalndaMaster: NALNDA token's address can't be null!"
-        );
+        require(_NALNDA != address(0), "NalndaMaster: NALNDA token's address can't be null!");
         NALNDA = IERC20(_NALNDA);
         ITOMarketplace = address(new NalndaMarketplaceITO(_NALNDA));
         transferAfterDays = 21; //21 days
@@ -44,53 +42,30 @@ contract NalndaMaster is NalndaMasterBase, Ownable {
         uint256 _lang,
         uint256[] memory _genre
     ) external {
-        require(
-            _author != address(0),
-            "NalndaMaster: Author address can't be null!"
-        );
-        require(
-            bytes(_coverURI).length > 0,
-            "NalndaMaster: Empty string passed as cover URI!"
-        );
+        require(_author != address(0), "NalndaMaster: Author address can't be null!");
+        require(bytes(_coverURI).length > 0, "NalndaMaster: Empty string passed as cover URI!");
         require(
             _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
             "NalndaMaster: Days to secondary sales should be between 90 and 150!"
         );
-        require(
-            _lang > 0 && _lang <= 100,
-            "NalndaMaster: Book language tag should be between 1 and 100!"
-        );
-        for (uint256 i = 0; i < _genre.length; i++)
-            require(
-                _genre[i] > 0 && _genre[i] <= 60,
-                "NalndaMaster: Book genre tag should be between 1 and 60!"
-            );
+        require(_lang > 0 && _lang <= 100, "NalndaMaster: Book language tag should be between 1 and 100!");
+        for (uint256 i = 0; i < _genre.length; i++) {
+            require(_genre[i] > 0 && _genre[i] <= 60, "NalndaMaster: Book genre tag should be between 1 and 60!");
+        }
         address _addressOutput = address(
             new NalndaITOBook(
-                _initialTotalDOs,
-                _author,
-                _coverURI,
-                _initialPrice,
-                _daysForSecondarySales,
-                _lang,
-                _genre
+                _initialTotalDOs, _author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre
             )
         );
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
     }
 
-    function approveBookStartITO(
-        address _book,
-        address[] memory _approvedAddresses
-    ) public onlyOwner {
+    function approveBookStartITO(address _book, address[] memory _approvedAddresses) public onlyOwner {
         INalndaITOBook(_book).approveBookStartITO(_approvedAddresses);
     }
 
-    function addMoreApprovedAddressesITO(
-        address _book,
-        address[] memory _approvedAddresses
-    ) external onlyOwner {
+    function addMoreApprovedAddressesITO(address _book, address[] memory _approvedAddresses) external onlyOwner {
         INalndaITOBook(_book).addMoreApprovedAddresses(_approvedAddresses);
     }
 

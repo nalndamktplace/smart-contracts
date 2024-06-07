@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.15;
+pragma solidity 0.8.25;
 
 import "../mocks/NALNDA.sol";
 import "../interfaces/INalndaMarketplace.sol";
@@ -26,32 +26,15 @@ contract NalndaDiscountV1 is Ownable {
 
     uint256[] public tokenIds;
 
-    constructor(
-        address _NALNDA,
-        address _marketplace,
-        uint256[] memory _tokenIds,
-        uint256[] memory _discounts
-    ) {
-        require(
-            _NALNDA != address(0),
-            "NalndaDiscountV1: NALNDA address can't be null!"
-        );
-        require(
-            Address.isContract(_NALNDA) == true,
-            "NalndaDiscountV1: NALNDA address is not a contract!!!"
-        );
-        require(
-            Address.isContract(_marketplace) == true,
-            "NalndaDiscountV1: Marketplace address is not a contract!!!"
-        );
-        require(
-            _tokenIds.length == _discounts.length,
-            "NalndaDiscountV1: Invalid token ids or discounts provided!"
-        );
+    constructor(address _NALNDA, address _marketplace, uint256[] memory _tokenIds, uint256[] memory _discounts) {
+        require(_NALNDA != address(0), "NalndaDiscountV1: NALNDA address can't be null!");
+        require(Address.isContract(_NALNDA) == true, "NalndaDiscountV1: NALNDA address is not a contract!!!");
+        require(Address.isContract(_marketplace) == true, "NalndaDiscountV1: Marketplace address is not a contract!!!");
+        require(_tokenIds.length == _discounts.length, "NalndaDiscountV1: Invalid token ids or discounts provided!");
         tokenIds = _tokenIds;
         NALNDA = IERC20(_NALNDA);
         marketplace = INalndaMarketplace(_marketplace);
-        expiry = 2**256 - 1; //never expires
+        expiry = 2 ** 256 - 1; //never expires
         //deployed on matic mainnet
         funkyReaders = IERC1155(0x2953399124F0cBB46d2CbACD8A89cF0599974963);
         for (uint256 i = 0; i < _tokenIds.length; i++) {
