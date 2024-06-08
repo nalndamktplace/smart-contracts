@@ -70,10 +70,6 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         _createNewBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
     }
 
-    function tst(uint256[][] memory _genre) public pure returns (uint256) {
-        return _genre.length;
-    }
-
     function createNewBooks(
         address[] memory _author,
         string[] memory _coverURI,
