@@ -26,6 +26,10 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     );
     event RevenueWithdrawn(uint256 _revenueWithdrawn);
 
+    NalndaBook public immutable book_implementation;
+    uint256 public immutable chainId;
+    uint256 private extraSalt;
+
     constructor(address _NALNDA) {
         require(_NALNDA != address(0), "NalndaMarketplace: NALNDA token's address can't be null!");
         NALNDA = IERC20(_NALNDA);
@@ -33,6 +37,13 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
+        extraSalt = 0;
+        uint256 _chainid;
+        assembly {
+            _chainid := chainid()
+        }
+        chainId = _chainid;
+        book_implementation = new NalndaBook();
         discountContract = INalndaDiscount(address(0));
     }
 
@@ -66,13 +77,42 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         for (uint256 i = 0; i < _genre.length; i++) {
             require(_genre[i] >= 0 && _genre[i] < 100, "NalndaMarketplace: Book genre tag should be between 1 and 60!");
         }
-
-        //TODO: add ERC1967Proxy here
         address _addressOutput =
-            address(new NalndaBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre));
+            _deployBookProxy(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
         emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice, _lang, _genre);
+    }
+
+    function _deployBookProxy(
+        address _author,
+        string memory _coverURI,
+        uint256 _initialPrice,
+        uint256 _daysForSecondarySales,
+        uint256 _lang,
+        uint256[] memory _genre
+    ) private returns (address _deployedProxy) {
+        extraSalt = extraSalt + 1;
+        uint256 salt = uint256(
+            keccak256(
+                abi.encodePacked(
+                    chainId, address(this), _author, _coverURI, _initialPrice, _lang, _genre.length, extraSalt
+                )
+            )
+        );
+        _deployedProxy = address(
+            NalndaBook(
+                payable(
+                    new ERC1967Proxy{salt: bytes32(salt)}(
+                        address(book_implementation),
+                        abi.encodeCall(
+                            NalndaBook.initialize,
+                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre)
+                        )
+                    )
+                )
+            )
+        );
     }
 
     function approveBooks(address[] memory _books) public onlyOwner {

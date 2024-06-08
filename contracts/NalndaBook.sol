@@ -75,7 +75,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
         bookLang = _lang;
         bookGenre = _genre;
         marketplaceContract = INalndaMarketplace(_msgSender());
-        transferOwnership(_author);
+        _transferOwnership(_author);
         protocolMintFee = 20; //20% on safemint
         protocolFee = 2; //2% on every transfer
         bookOwnerShare = 10; //10% on every transfer
