@@ -67,6 +67,40 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         uint256 _lang,
         uint256[] memory _genre
     ) external {
+        _createNewBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
+    }
+
+    function tst(uint256[][] memory _genre) public pure returns (uint256) {
+        return _genre.length;
+    }
+
+    function createNewBooks(
+        address[] memory _author,
+        string[] memory _coverURI,
+        uint256[] memory _initialPrice,
+        uint256[] memory _daysForSecondarySales,
+        uint256[] memory _lang,
+        uint256[][] memory _genre
+    ) external {
+        require(
+            _author.length == _coverURI.length && _coverURI.length == _initialPrice.length
+                && _initialPrice.length == _daysForSecondarySales.length && _daysForSecondarySales.length == _lang.length
+                && _lang.length == _genre.length,
+            "NalndaMarketplace: Array lengths should be equal!"
+        );
+        for (uint256 i = 0; i < _author.length; i++) {
+            _createNewBook(_author[i], _coverURI[i], _initialPrice[i], _daysForSecondarySales[i], _lang[i], _genre[i]);
+        }
+    }
+
+    function _createNewBook(
+        address _author,
+        string memory _coverURI,
+        uint256 _initialPrice,
+        uint256 _daysForSecondarySales,
+        uint256 _lang,
+        uint256[] memory _genre
+    ) private {
         require(_author != address(0), "NalndaMarketplace: Author address can't be null!");
         require(bytes(_coverURI).length > 0, "NalndaMarketplace: Empty string passed as cover URI!");
         //require(
