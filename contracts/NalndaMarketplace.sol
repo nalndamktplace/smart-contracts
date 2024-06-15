@@ -8,6 +8,7 @@ import "./NalndaBook.sol";
 import "./interfaces/INalndaBook.sol";
 import "./interfaces/INalndaDiscount.sol";
 import "./Dependencies/NalndaMarketplaceBase.sol";
+import "@openzeppelin/contracts/utils/Create2.sol";
 
 //primary sales /lazy minintg will only happen using NALNDA token.
 contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
@@ -134,6 +135,82 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             NalndaBook(
                 payable(
                     new ERC1967Proxy{salt: bytes32(salt)}(
+                        address(book_implementation),
+                        abi.encodeCall(
+                            NalndaBook.initialize,
+                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre)
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    function computeNextBookAddress(
+        address _author,
+        string memory _coverURI,
+        uint256 _initialPrice,
+        uint256 _daysForSecondarySales,
+        uint256 _lang,
+        uint256[] memory _genre
+    ) public view returns (address _estimatedAddress) {
+        _estimatedAddress =
+            _computeBookAddress(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, extraSalt + 1);
+    }
+
+    function computeNextBooksAddresses(
+        address[] memory _author,
+        string[] memory _coverURI,
+        uint256[] memory _initialPrice,
+        uint256[] memory _daysForSecondarySales,
+        uint256[] memory _lang,
+        uint256[][] memory _genre
+    ) public view returns (address[] memory) {
+        uint256 _extraSalt = extraSalt;
+        address[] memory _estimatedAddresses = new address[](_author.length);
+        require(
+            _author.length == _coverURI.length && _coverURI.length == _initialPrice.length
+                && _initialPrice.length == _daysForSecondarySales.length && _daysForSecondarySales.length == _lang.length
+                && _lang.length == _genre.length,
+            "NalndaMarketplace: Array lengths should be equal!"
+        );
+        for (uint256 i = 0; i < _author.length; i++) {
+            _estimatedAddresses[i] = _computeBookAddress(
+                _author[i],
+                _coverURI[i],
+                _initialPrice[i],
+                _daysForSecondarySales[i],
+                _lang[i],
+                _genre[i],
+                _extraSalt + i + 1
+            );
+        }
+        return _estimatedAddresses;
+    }
+
+    function _computeBookAddress(
+        address _author,
+        string memory _coverURI,
+        uint256 _initialPrice,
+        uint256 _daysForSecondarySales,
+        uint256 _lang,
+        uint256[] memory _genre,
+        uint256 _extraSalt
+    ) private view returns (address _estimatedAddress) {
+        uint256 salt = uint256(
+            keccak256(
+                abi.encodePacked(
+                    chainId, address(this), _author, _coverURI, _initialPrice, _lang, _genre.length, _extraSalt
+                )
+            )
+        );
+
+        _estimatedAddress = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
                         address(book_implementation),
                         abi.encodeCall(
                             NalndaBook.initialize,
