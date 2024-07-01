@@ -35,7 +35,7 @@ module.exports = {
   defaultNetwork: "hardhat",
   networks: {
     amoy: {
-      url: `https://rpc-amoy.polygon.technology`,
+      url: "https://rpc.ankr.com/polygon_amoy",
       accounts: [`${process.env.PRIVATE_KEY}`],
     },
     bsc_testnet: {
