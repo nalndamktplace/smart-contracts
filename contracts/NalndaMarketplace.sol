@@ -30,7 +30,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     uint256 public immutable chainId;
     uint256 private extraSalt;
 
-    constructor(address _purchaseToken) {
+    constructor(address _purchaseToken, address _initOwner) {
         require(_purchaseToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
         purchaseToken = IERC20(_purchaseToken);
         transferAfterDays = 21; //21 days
@@ -44,7 +44,8 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         }
         chainId = _chainid;
         book_implementation = new NalndaBook();
-        nalndaAirdrop = new NalndaAirdrop();
+        nalndaAirdrop = new NalndaAirdrop(_initOwner);
+        _transferOwnership(_initOwner);
     }
 
     function changeTransferAfterDays(uint256 _days) external onlyOwner {
