@@ -4,9 +4,10 @@ pragma solidity 0.8.25;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/INalndaDiscount.sol";
 import "../interfaces/INalndaBook.sol";
+import "../Airdrop.sol";
 
 abstract contract NalndaMarketplaceBase {
-    IERC20 public NALNDA;
+    IERC20 public purchaseToken;
 
     mapping(address => address[]) public authorToBooks;
 
@@ -19,6 +20,8 @@ abstract contract NalndaMarketplaceBase {
     uint256 public secondarySaleAfterDays;
 
     INalndaDiscount public discountContract;
+
+    NalndaAirdrop public nalndaAirdrop;
 
     enum Stage {
         UNLISTED,

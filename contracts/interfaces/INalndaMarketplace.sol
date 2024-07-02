@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 interface INalndaMarketplace {
-    function NALNDA() external view returns (address);
+    function purchaseToken() external view returns (address);
 
     function transferAfterDays() external view returns (uint256);
 

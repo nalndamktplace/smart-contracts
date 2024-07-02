@@ -6,11 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./NalndaBook.sol";
 import "./interfaces/INalndaBook.sol";
-import "./interfaces/INalndaDiscount.sol";
 import "./Dependencies/NalndaMarketplaceBase.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
 
-//primary sales /lazy minintg will only happen using NALNDA token.
+//primary sales /lazy minintg will only happen using purchaseToken token.
 contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     //Events
     event NewBookCreated(
@@ -31,9 +30,9 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     uint256 public immutable chainId;
     uint256 private extraSalt;
 
-    constructor(address _NALNDA) {
-        require(_NALNDA != address(0), "NalndaMarketplace: NALNDA token's address can't be null!");
-        NALNDA = IERC20(_NALNDA);
+    constructor(address _purchaseToken) {
+        require(_purchaseToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
+        purchaseToken = IERC20(_purchaseToken);
         transferAfterDays = 21; //21 days
         secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
         totalBooksCreated = 0;
@@ -45,11 +44,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         }
         chainId = _chainid;
         book_implementation = new NalndaBook();
-        discountContract = INalndaDiscount(address(0));
-    }
-
-    function setDiscountContract(address _newAddress) external onlyOwner {
-        discountContract = INalndaDiscount(_newAddress);
+        nalndaAirdrop = new NalndaAirdrop();
     }
 
     function changeTransferAfterDays(uint256 _days) external onlyOwner {
@@ -241,12 +236,12 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
     function withdrawRevenue() external onlyOwner {
         uint256 balance = getNALNDABalance();
         require(balance != 0, "NalndaMarketplace: Nothing to withdraw!");
-        NALNDA.transfer(owner(), balance);
+        purchaseToken.transfer(owner(), balance);
         emit RevenueWithdrawn(balance);
     }
 
     function getNALNDABalance() public view returns (uint256 bal) {
-        bal = NALNDA.balanceOf((address(this)));
+        bal = purchaseToken.balanceOf((address(this)));
     }
 
     function listCover(INalndaBook _book, uint256 _tokenId, uint256 _price) external {
@@ -289,13 +284,13 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         require(ORDER[_orderId].book.approved() == true, "NalndaMarketplace: Sales on this book are disabled!");
         require(ORDER[_orderId].stage == Stage.LISTED, "NalndaMarketplace: NFT not yet listed / already sold!");
         ORDER[_orderId].stage = Stage.SOLD; //to prevent reentrancy
-        NALNDA.transferFrom(_msgSender(), address(this), ORDER[_orderId].price);
+        purchaseToken.transferFrom(_msgSender(), address(this), ORDER[_orderId].price);
         //send author commision
         uint256 authorShare = (ORDER[_orderId].price * 10) / 100; //10% for author
-        NALNDA.transfer(Ownable(address(ORDER[_orderId].book)).owner(), authorShare);
+        purchaseToken.transfer(Ownable(address(ORDER[_orderId].book)).owner(), authorShare);
         //send seller its share
         uint256 sellerShare = (ORDER[_orderId].price * 88) / 100; //88% to the seller
-        NALNDA.transfer(ORDER[_orderId].seller, sellerShare);
+        purchaseToken.transfer(ORDER[_orderId].seller, sellerShare);
         //update last sold price
         ORDER[_orderId].book.updateLastSoldPrice(ORDER[_orderId].tokenId, ORDER[_orderId].price);
         //transfer NFT to the buyer
