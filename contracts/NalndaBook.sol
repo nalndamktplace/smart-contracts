@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/INalndaMarketplace.sol";
+import "./Airdrop.sol";
 
 contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable, UUPSUpgradeable {
     using Counters for Counters.Counter;
@@ -29,6 +30,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
     string public uri;
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
+    NalndaAirdrop public airdrop;
 
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
@@ -55,7 +57,8 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
-        uint256[] memory _genre
+        uint256[] memory _genre,
+        NalndaAirdrop _airdrop
     ) public virtual initializer {
         require(_author != address(0), "NalndaBook: Author's address can't be null!");
         require(bytes(_uri).length > 0, "NalndaBook: Empty string passed as cover URI!!!");
@@ -68,6 +71,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
         for (uint256 i = 0; i < _genre.length; i++) {
             require(_genre[i] >= 0 && _genre[i] < 100, "NalndaBook: Book genre tag should be between 1 and 60!");
         }
+        airdrop = _airdrop;
         approved = true; // for testing
         daysForSecondarySales = _daysForSecondarySales;
         secondarySalesTimestamp = 2 ** 256 - 1;
@@ -158,6 +162,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
+        airdrop.distributeTokensIfAny(to);
     }
 
     function batchSafeMint(address[] memory addresses) external marketplaceApproved {
@@ -179,6 +184,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
             //first mint for author then transfer to buyer
             _safeMint(owner(), _tokenId);
             _transfer(owner(), addresses[i], _tokenId);
+            airdrop.distributeTokensIfAny(addresses[i]);
         }
     }
 

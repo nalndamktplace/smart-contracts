@@ -34,7 +34,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         require(_purchaseToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
         purchaseToken = IERC20(_purchaseToken);
         transferAfterDays = 21; //21 days
-        secondarySaleAfterDays = 21; //user should have owned cover for atlease 21 days
+        secondarySaleAfterDays = 21; //user should have owned cover for at least 21 days
         totalBooksCreated = 0;
         lastOrderId = 0;
         extraSalt = 0;
@@ -44,7 +44,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
         }
         chainId = _chainid;
         book_implementation = new NalndaBook();
-        nalndaAirdrop = new NalndaAirdrop(_initOwner);
+        nalndaAirdrop = new NalndaAirdrop(_initOwner, address(this));
         _transferOwnership(_initOwner);
     }
 
@@ -108,6 +108,21 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
             _deployBookProxy(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
+        if (totalBooksCreated > 0 && totalBooksCreated <= 5000) {
+            nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, INalndaMarketplace.AirdropSlab.ZeroToFiveK);
+        } else if (totalBooksCreated > 5000 && totalBooksCreated <= 10000) {
+            nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, INalndaMarketplace.AirdropSlab.FiveK1ToTenK);
+        } else if (totalBooksCreated > 10000 && totalBooksCreated <= 20000) {
+            nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, INalndaMarketplace.AirdropSlab.TenK1ToTwentyK);
+        } else if (totalBooksCreated > 20000 && totalBooksCreated <= 30000) {
+            nalndaAirdrop.setBookSlabAndAllowDistribution(
+                _addressOutput, INalndaMarketplace.AirdropSlab.TwentyK1ToThirtyK
+            );
+        } else if (totalBooksCreated > 30000 && totalBooksCreated <= 50000) {
+            nalndaAirdrop.setBookSlabAndAllowDistribution(
+                _addressOutput, INalndaMarketplace.AirdropSlab.ThirtyK1ToFiftyK
+            );
+        }
         emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice, _lang, _genre);
     }
 
@@ -134,7 +149,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
                         address(book_implementation),
                         abi.encodeCall(
                             NalndaBook.initialize,
-                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre)
+                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, nalndaAirdrop)
                         )
                     )
                 )
@@ -210,7 +225,7 @@ contract NalndaMarketplace is NalndaMarketplaceBase, Ownable {
                         address(book_implementation),
                         abi.encodeCall(
                             NalndaBook.initialize,
-                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre)
+                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, nalndaAirdrop)
                         )
                     )
                 )
