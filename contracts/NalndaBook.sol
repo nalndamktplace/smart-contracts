@@ -71,7 +71,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
             require(_genre[i] >= 0 && _genre[i] < 100, "NalndaBook: Book genre tag should be between 1 and 60!");
         }
         airdrop = _airdrop;
-        approved = true; // for testing
+        approved = true; // for testing -- should be false in production
         daysForSecondarySales = _daysForSecondarySales;
         secondarySalesTimestamp = 2 ** 256 - 1;
         bookLang = _lang;
