@@ -1,4 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
+require("@nomicfoundation/hardhat-verify");
 require("dotenv").config();
 
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -43,8 +44,9 @@ module.exports = {
   },
   defaultNetwork: "hardhat",
   networks: {
-    amoy: {
+    polygonAmoy: {
       url: "https://rpc.ankr.com/polygon_amoy",
+      // url: "https://rpc-amoy.polygon.technology",
       accounts: [`${process.env.PRIVATE_KEY}`],
     },
     bsc_testnet: {
@@ -59,6 +61,11 @@ module.exports = {
       accounts: {
         count: 3000,
       },
+    },
+  },
+  etherscan: {
+    apiKey: {
+      polygonAmoy: "MJUZY5I2TI7D96ARX49B5N49X342VI8HVS",
     },
   },
 };

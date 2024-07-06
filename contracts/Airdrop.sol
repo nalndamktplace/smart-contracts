@@ -57,8 +57,7 @@ contract NalndaAirdrop is Ownable {
         return nalndaToken.balanceOf(address(this));
     }
 
-    function distributeTokensIfAny(address buyer) external canDistribute(msg.sender) {
-        uint256 nalndaBalance = nalndaToken.balanceOf(address(this));
+    function distributeTokensIfAny(address buyer) public canDistribute(msg.sender) {
         if (isAirdropActive() == false) {
             return;
         }
@@ -69,6 +68,7 @@ contract NalndaAirdrop is Ownable {
         if (remainingEligibleBuyers[slab] == 0) {
             return;
         }
+        uint256 nalndaBalance = nalndaToken.balanceOf(address(this));
         if (nalndaBalance < tokensToDistributePerBook[slab]) {
             return;
         }

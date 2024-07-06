@@ -7,7 +7,12 @@ async function main() {
   const NalndaMarketplace = await hre.ethers.getContractFactory(
     "NalndaMarketplace"
   );
-  const marketplace = await NalndaMarketplace.deploy(process.env.NALNDA_ERC20);
+
+  const initOwner = "0x7Eb53157E284Ba3a6a055117F726Ed59a29A0536";
+  const marketplace = await NalndaMarketplace.deploy(
+    process.env.NALNDA_ERC20,
+    initOwner
+  );
   await marketplace.deployed();
 
   //await hre.run("verify:verify", {

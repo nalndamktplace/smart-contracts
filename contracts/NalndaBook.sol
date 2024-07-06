@@ -162,7 +162,7 @@ contract NalndaBook is ERC721, Pausable, ERC721Burnable, Ownable, Initializable,
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
-        airdrop.distributeTokensIfAny(to);
+        //airdrop.distributeTokensIfAny(to);
     }
 
     function batchSafeMint(address[] memory addresses) external marketplaceApproved {
