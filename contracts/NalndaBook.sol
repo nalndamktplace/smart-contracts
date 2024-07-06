@@ -6,14 +6,13 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./NalndaMarketplace.sol";
 import "./Airdrop.sol";
+import "./tokens/NalndaToken.sol";
 
-contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgradeable {
+contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     uint256 private _nextTokenId;
-    IERC20 public purchaseToken;
     NalndaMarketplace public marketplaceContract;
     uint256 public protocolMintFee;
     uint256 public protocolFee;
@@ -27,6 +26,7 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
     uint256 public mintPrice;
     uint256 public authorEarningsPaidout;
     NalndaAirdrop public airdrop;
+    NalndaToken public nalndaToken;
 
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
@@ -81,9 +81,9 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
         protocolMintFee = 20; //20% on safemint
         protocolFee = 2; //2% on every transfer
         bookOwnerShare = 10; //10% on every transfer
-        purchaseToken = IERC20(marketplaceContract.purchaseToken());
         uri = string(_uri);
         mintPrice = _initialPrice;
+        nalndaToken = NalndaToken(marketplaceContract.nalndaToken());
     }
 
     function changeApproval(bool _newApproved) external onlyMarketplace {
@@ -137,8 +137,9 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
 
     //public method for minting new cover
     function safeMint(address to) external marketplaceApproved {
+        IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         //transfer the minting cost to the contract
-        purchaseToken.transferFrom(_msgSender(), address(this), mintPrice);
+        purchaseToken.transferFrom(msg.sender, address(this), mintPrice);
         uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
         uint256 ownerShare = mintPrice - protocolPayout;
         //send commision to marketplaceContract
@@ -153,10 +154,11 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
         //first mint for author then transfer to buyer
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
-        //airdrop.distributeTokensIfAny(to);
+        airdrop.distributeTokensIfAny(to);
     }
 
     function batchSafeMint(address[] memory addresses) external marketplaceApproved {
+        IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         //transfer the minting cost to the contract
         uint256 cost = mintPrice * addresses.length;
         purchaseToken.transferFrom(_msgSender(), address(this), cost);
@@ -175,11 +177,12 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
             //first mint for author then transfer to buyer
             _safeMint(owner(), _tokenId);
             _transfer(owner(), addresses[i], _tokenId);
-            //            airdrop.distributeTokensIfAny(addresses[i]);
+            airdrop.distributeTokensIfAny(addresses[i]);
         }
     }
 
     function _chargeTransferFees(uint256 tokenId) internal {
+        IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         uint256 lastSellPrice = lastSoldPrice[tokenId];
         //charging transfer fee
         uint256 totalFee = (lastSellPrice * (bookOwnerShare + protocolFee)) / 100;
@@ -232,13 +235,5 @@ contract NalndaBook is ERC721, Ownable, ERC721Burnable, Initializable, UUPSUpgra
 
     function renounceOwnership() public virtual override onlyOwner {
         revert("NalndaBook: Ownership of a book cannot be renounced!");
-    }
-
-    function burn(uint256 tokenId) public virtual override {
-        lastSoldPrice[tokenId] = 0;
-        ownedAt[tokenId] = 0;
-        // Setting an "auth" arguments enables the `_isAuthorized` check which verifies that the token exists
-        // (from != 0). Therefore, it is not needed to verify that the return value is not 0 here.
-        _update(address(0), tokenId, _msgSender());
     }
 }

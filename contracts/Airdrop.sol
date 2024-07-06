@@ -3,13 +3,24 @@ pragma solidity 0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./tokens/NalndaToken.sol";
-import "./ICommon.sol";
 import "./NalndaMarketplace.sol";
 
-contract NalndaAirdrop is Ownable, ICommon {
-    NalndaToken immutable nalndaToken;
+contract NalndaAirdrop is Ownable {
+    enum AirdropSlab {
+        ZeroToFiveK,
+        FiveK1ToTenK,
+        TenK1ToTwentyK,
+        TwentyK1ToThirtyK,
+        ThirtyK1ToFiftyK,
+        MoreThanFiftyK
+    }
+
+    NalndaToken public immutable nalndaToken;
     uint256 public immutable maxAirdropTokens;
     NalndaMarketplace immutable marketplace;
+
+    uint256 private ctrForAirdrop;
+    AirdropSlab public currentSlab;
 
     modifier onlyMarketplace() {
         require(msg.sender == address(marketplace), "Only the marketplace can call this function");
@@ -17,9 +28,6 @@ contract NalndaAirdrop is Ownable, ICommon {
     }
 
     mapping(AirdropSlab => uint256) public tokensToDistributePerBook;
-    mapping(AirdropSlab => uint256) public remainingEligibleBuyers; // slab to remaining eligible buyers
-    mapping(address => AirdropSlab) public booksToSlab; // book address to slab
-    mapping(address => bool) public allowDistributionByBook;
 
     constructor(address _initOwner, address _marketplace) Ownable(_initOwner) {
         nalndaToken = new NalndaToken(address(this), _initOwner);
@@ -33,20 +41,11 @@ contract NalndaAirdrop is Ownable, ICommon {
         tokensToDistributePerBook[AirdropSlab.TwentyK1ToThirtyK] = 150 * 10 ** nalndaToken.decimals();
         tokensToDistributePerBook[AirdropSlab.ThirtyK1ToFiftyK] = 100 * 10 ** nalndaToken.decimals();
 
-        remainingEligibleBuyers[AirdropSlab.ZeroToFiveK] = 5000;
-        remainingEligibleBuyers[AirdropSlab.FiveK1ToTenK] = 5000;
-        remainingEligibleBuyers[AirdropSlab.TenK1ToTwentyK] = 10000;
-        remainingEligibleBuyers[AirdropSlab.TwentyK1ToThirtyK] = 10000;
-        remainingEligibleBuyers[AirdropSlab.ThirtyK1ToFiftyK] = 20000;
+        ctrForAirdrop = 0;
     }
 
-    function setBookSlabAndAllowDistribution(address book, AirdropSlab slab) external onlyMarketplace {
-        booksToSlab[book] = slab;
-        allowDistributionByBook[book] = true;
-    }
-
-    modifier canDistribute(address book) {
-        require(allowDistributionByBook[book], "Distribution not allowed for this book");
+    modifier calledByBook(address book) {
+        require(marketplace.createdBooks(book), "Only books created by the marketplace allowed!");
         _;
     }
 
@@ -54,23 +53,51 @@ contract NalndaAirdrop is Ownable, ICommon {
         return nalndaToken.balanceOf(address(this));
     }
 
-    function distributeTokensIfAny(address buyer) public canDistribute(msg.sender) {
+    function distributeTokensIfAny(address buyer) public calledByBook(msg.sender) {
         if (isAirdropActive() == false) {
             return;
         }
-        AirdropSlab slab = booksToSlab[msg.sender];
-        if (slab == AirdropSlab.None) {
-            return;
-        }
-        if (remainingEligibleBuyers[slab] == 0) {
+        adjustSlabIfNeeded();
+        if (currentSlab == AirdropSlab.MoreThanFiftyK) {
             return;
         }
         uint256 nalndaBalance = nalndaToken.balanceOf(address(this));
-        if (nalndaBalance < tokensToDistributePerBook[slab]) {
+        if (nalndaBalance < tokensToDistributePerBook[currentSlab]) {
             return;
         }
-        nalndaToken.transfer(buyer, tokensToDistributePerBook[slab]);
-        remainingEligibleBuyers[slab] -= 1;
+        nalndaToken.transfer(buyer, tokensToDistributePerBook[currentSlab]);
+    }
+
+    function adjustSlabIfNeeded() private {
+        if (currentSlab == AirdropSlab.MoreThanFiftyK) {
+            return;
+        }
+        ++ctrForAirdrop;
+        if (ctrForAirdrop > 0 && ctrForAirdrop <= 5000) {
+            if (currentSlab != AirdropSlab.ZeroToFiveK) {
+                currentSlab = AirdropSlab.ZeroToFiveK;
+            }
+        } else if (ctrForAirdrop > 5000 && ctrForAirdrop <= 10000) {
+            if (currentSlab != AirdropSlab.FiveK1ToTenK) {
+                currentSlab = AirdropSlab.FiveK1ToTenK;
+            }
+        } else if (ctrForAirdrop > 10000 && ctrForAirdrop <= 20000) {
+            if (currentSlab != AirdropSlab.TenK1ToTwentyK) {
+                currentSlab = AirdropSlab.TenK1ToTwentyK;
+            }
+        } else if (ctrForAirdrop > 20000 && ctrForAirdrop <= 30000) {
+            if (currentSlab != AirdropSlab.TwentyK1ToThirtyK) {
+                currentSlab = AirdropSlab.TwentyK1ToThirtyK;
+            }
+        } else if (ctrForAirdrop > 30000 && ctrForAirdrop <= 50000) {
+            if (currentSlab != AirdropSlab.ThirtyK1ToFiftyK) {
+                currentSlab = AirdropSlab.ThirtyK1ToFiftyK;
+            }
+        } else {
+            if (currentSlab != AirdropSlab.MoreThanFiftyK) {
+                currentSlab = AirdropSlab.MoreThanFiftyK;
+            }
+        }
     }
 
     function withdrawAllNalndaAndStopAirdrop() external onlyOwner {

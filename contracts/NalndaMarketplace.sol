@@ -5,12 +5,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./NalndaBook.sol";
-import "./ICommon.sol";
+import "./tokens/NalndaToken.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
 
-//primary sales /lazy minintg will only happen using purchaseToken token.
-contract NalndaMarketplace is Ownable, ICommon {
+contract NalndaMarketplace is Ownable {
     IERC20 public purchaseToken;
+
+    NalndaToken public immutable nalndaToken;
 
     mapping(address => address[]) public authorToBooks;
 
@@ -23,6 +24,8 @@ contract NalndaMarketplace is Ownable, ICommon {
     uint256 public secondarySaleAfterDays;
 
     NalndaAirdrop public nalndaAirdrop;
+
+    bool public publicBookCreationAllowed;
 
     enum Stage {
         UNLISTED,
@@ -40,9 +43,9 @@ contract NalndaMarketplace is Ownable, ICommon {
         uint256 price;
     }
 
-    //orderId => Order
     mapping(uint256 => Order) public ORDER;
-    //Events
+
+    mapping(address => bool) public createdBooks;
 
     event NewBookCreated(
         address indexed _author, address _bookAddress, string _coverURI, uint256 _price, uint256 _lang, uint256[] _genre
@@ -62,8 +65,33 @@ contract NalndaMarketplace is Ownable, ICommon {
     uint256 public immutable chainId;
     uint256 private extraSalt;
 
-    constructor(address _purchaseToken, address _initOwner) Ownable(_initOwner) {
+    address public authorizedBookCreator;
+
+    function setAuthorizedBookCreator(address _newCreator) external onlyOwner {
+        authorizedBookCreator = _newCreator;
+    }
+
+    function publicCreationAllowed() private view {
+        if (publicBookCreationAllowed == true) {
+            return;
+        }
+        require(
+            _msgSender() == authorizedBookCreator, "NalndaMarketplace: Only authorized book creator can create books!"
+        );
+    }
+
+    function allowPublicBookCreation() external onlyOwner {
+        publicBookCreationAllowed = true;
+    }
+
+    function changePurchaseToken(address _newToken) external onlyOwner {
+        require(_newToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
+        purchaseToken = IERC20(_newToken);
+    }
+
+    constructor(address _purchaseToken, address _initOwner, address _authBookCreator) Ownable(_initOwner) {
         require(_purchaseToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
+        publicBookCreationAllowed = false;
         purchaseToken = IERC20(_purchaseToken);
         transferAfterDays = 21; //21 days
         secondarySaleAfterDays = 21; //user should have owned cover for at least 21 days
@@ -77,6 +105,8 @@ contract NalndaMarketplace is Ownable, ICommon {
         chainId = _chainid;
         book_implementation = new NalndaBook(address(this));
         nalndaAirdrop = new NalndaAirdrop(_initOwner, address(this));
+        nalndaToken = nalndaAirdrop.nalndaToken();
+        authorizedBookCreator = _authBookCreator;
     }
 
     function changeTransferAfterDays(uint256 _days) external onlyOwner {
@@ -95,6 +125,7 @@ contract NalndaMarketplace is Ownable, ICommon {
         uint256 _lang,
         uint256[] memory _genre
     ) external {
+        publicCreationAllowed();
         _createNewBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
     }
 
@@ -106,6 +137,7 @@ contract NalndaMarketplace is Ownable, ICommon {
         uint256[] memory _lang,
         uint256[][] memory _genre
     ) external {
+        publicCreationAllowed();
         require(
             _author.length == _coverURI.length && _coverURI.length == _initialPrice.length
                 && _initialPrice.length == _daysForSecondarySales.length && _daysForSecondarySales.length == _lang.length
@@ -139,17 +171,7 @@ contract NalndaMarketplace is Ownable, ICommon {
             _deployBookProxy(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
-        if (totalBooksCreated > 0 && totalBooksCreated <= 5000) {
-            //nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, AirdropSlab.ZeroToFiveK);
-        } else if (totalBooksCreated > 5000 && totalBooksCreated <= 10000) {
-            //nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, AirdropSlab.FiveK1ToTenK);
-        } else if (totalBooksCreated > 10000 && totalBooksCreated <= 20000) {
-            //nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, AirdropSlab.TenK1ToTwentyK);
-        } else if (totalBooksCreated > 20000 && totalBooksCreated <= 30000) {
-            //nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, AirdropSlab.TwentyK1ToThirtyK);
-        } else if (totalBooksCreated > 30000 && totalBooksCreated <= 50000) {
-            //nalndaAirdrop.setBookSlabAndAllowDistribution(_addressOutput, AirdropSlab.ThirtyK1ToFiftyK);
-        }
+        createdBooks[_addressOutput] = true;
         emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice, _lang, _genre);
     }
 

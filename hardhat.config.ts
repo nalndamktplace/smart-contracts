@@ -1,5 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-verify";
+import "@nomicfoundation/hardhat-toolbox";
+import "@nomiclabs/hardhat-etherscan";
+import "@openzeppelin/hardhat-upgrades";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -20,16 +22,6 @@ const config: HardhatUserConfig = {
           optimizer: {
             enabled: true,
             runs: 1,
-          },
-        },
-      },
-      {
-        version: "0.4.17",
-        settings: {
-          evmVersion: "byzantium",
-          optimizer: {
-            enabled: true,
-            runs: 200,
           },
         },
       },
