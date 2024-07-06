@@ -1,29 +1,13 @@
-# Smart contracts for Nalnda Marketplace
+# Sample Hardhat Project
 
-Hardhat commands:
+This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+
+Try running some of the following tasks:
 
 ```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
 npx hardhat help
-```
-
-### Deploy contracts:
-
-Step 1: Update the NALNDA_ERC20 in the .env file.
-
-Step 2: Run command:
-
-```shell
-npx hardhat run scripts/deployContracts.js --network <BLOCKCHAIN_NETWORK>
-```
-
-### Deploy a new Nalnda ERC20 test token:
-
-```shell
-npx hardhat run scripts/deployNalndaToken.js --network <BLOCKCHAIN_NETWORK>
+npx hardhat test
+REPORT_GAS=true npx hardhat test
+npx hardhat node
+npx hardhat ignition deploy ./ignition/modules/Lock.ts
 ```
