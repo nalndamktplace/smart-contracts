@@ -5,10 +5,10 @@ async function main() {
   const contract = await Contract.deploy();
   await contract.deployed();
   console.log("Contract deployed to:", contract.address);
-  //await contract.deployTransaction.wait(6);
-  //await hre.run("verify:verify", {
-  //  address: contract.address,
-  //  constructorArguments: [],
-  //});
+  await contract.deployTransaction.wait(6);
+  await hre.run("verify:verify", {
+    address: contract.address,
+    constructorArguments: [],
+  });
 }
 main();
