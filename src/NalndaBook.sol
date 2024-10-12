@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./NalndaMarketplace.sol";
-import "./Airdrop.sol";
+import "./NalndaAirdrop.sol";
 import "./tokens/NalndaToken.sol";
 
 contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
