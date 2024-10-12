@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./NalndaMarketplace.sol";
 import "./NalndaAirdrop.sol";
+import "./NalndaDiscounts.sol";
 import "./tokens/NalndaToken.sol";
 
 contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
@@ -23,7 +24,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     uint256 public bookLang;
     uint256[] public bookGenre;
     string public uri;
-    uint256 public mintPrice;
+    uint256 public mintPrice_;
     uint256 public authorEarningsPaidout;
     NalndaAirdrop public airdrop;
     NalndaToken public nalndaToken;
@@ -82,7 +83,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         protocolFee = 2; //2% on every transfer
         bookOwnerShare = 10; //10% on every transfer
         uri = string(_uri);
-        mintPrice = _initialPrice;
+        mintPrice_ = _initialPrice;
         nalndaToken = NalndaToken(marketplaceContract.nalndaToken());
     }
 
@@ -103,7 +104,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     }
 
     function changeMintPrice(uint256 _newPrice) external onlyOwner {
-        mintPrice = _newPrice;
+        mintPrice_ = _newPrice;
     }
 
     //owner should be able to mint for free at any point
@@ -135,10 +136,16 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         }
     }
 
+    function mintPriceLatest() public view returns (uint256) {
+        NalndaDiscounts discounts = NalndaDiscounts(marketplaceContract.nalndaDiscounts());
+        return mintPrice_;
+    }
+
     //public method for minting new cover
     function safeMint(address to) external marketplaceApproved {
         IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         //transfer the minting cost to the contract
+        uint256 mintPrice = mintPriceLatest();
         purchaseToken.transferFrom(msg.sender, address(this), mintPrice);
         uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
         uint256 ownerShare = mintPrice - protocolPayout;
@@ -160,6 +167,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     function batchSafeMint(address[] memory addresses) external marketplaceApproved {
         IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         //transfer the minting cost to the contract
+        uint256 mintPrice = mintPriceLatest();
         uint256 cost = mintPrice * addresses.length;
         purchaseToken.transferFrom(_msgSender(), address(this), cost);
         uint256 protocolPayout = (cost * protocolMintFee) / 100;

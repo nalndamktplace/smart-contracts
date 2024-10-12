@@ -5,26 +5,22 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./NalndaBook.sol";
+import "./NalndaDiscounts.sol";
 import "./tokens/NalndaToken.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
 
 contract NalndaMarketplace is Ownable {
     IERC20 public purchaseToken;
-
     NalndaToken public immutable nalndaToken;
+    NalndaDiscounts public immutable nalndaDiscounts;
+    NalndaAirdrop public nalndaAirdrop;
 
     mapping(address => address[]) public authorToBooks;
 
     uint256 public totalBooksCreated;
-
     uint256 public lastOrderId;
-
     uint256 public transferAfterDays;
-
     uint256 public secondarySaleAfterDays;
-
-    NalndaAirdrop public nalndaAirdrop;
-
     bool public publicBookCreationAllowed;
 
     enum Stage {
@@ -105,6 +101,7 @@ contract NalndaMarketplace is Ownable {
         chainId = _chainid;
         book_implementation = new NalndaBook(address(this));
         nalndaAirdrop = new NalndaAirdrop(_initOwner, address(this));
+        nalndaDiscounts = new NalndaDiscounts(_initOwner, address(this));
         nalndaToken = nalndaAirdrop.nalndaToken();
         authorizedBookCreator = _authBookCreator;
     }
