@@ -34,6 +34,19 @@ contract NalndaDiscounts is Ownable {
         chainId = _chainid;
     }
 
+    event CouponAdded(
+        bytes32 couponCode,
+        uint256 discountPercentage,
+        address verifyAddress,
+        uint256 expiryTimestamp,
+        uint256 maxClaims
+    );
+
+    event CouponStopped(bytes32 couponCode);
+    event CouponRedeemed(
+        bytes32 couponCode, address redeemAddress, uint256 _salt, uint256 originalPrice, uint256 discountPrice
+    );
+
     modifier onlyMarketplace() {
         require(msg.sender == marketplace, "NalndaDiscounts: Only marketplace can call this function");
         _;
@@ -65,11 +78,13 @@ contract NalndaDiscounts is Ownable {
         nonce_global++;
         discountCoupons[_couponCode] =
             DiscountCoupon(_couponCode, _discountPercentage, _couponVerifyAddress, _expiryTimestamp, _maxClaims);
+        emit CouponAdded(_couponCode, _discountPercentage, _couponVerifyAddress, _expiryTimestamp, _maxClaims);
     }
 
     function stopDiscountCoupon(bytes32 _couponCode) external onlyOwner {
         require(discountCoupons[_couponCode].discountPercentage > 0, "NalndaDiscounts: Coupon code does not exist");
         discountCoupons[_couponCode].expiryTimestamp = block.timestamp - 1;
+        emit CouponStopped(_couponCode);
     }
 
     function generateHashToSignForCoupon(bytes32 _couponCode, address _redeemAddress, uint256 _salt)
@@ -92,6 +107,7 @@ contract NalndaDiscounts is Ownable {
         uint256 updatedPrice = _getUpdatedPrice(_price, _couponCode, _signature, _hash);
         discountCoupons[_couponCode].claimsLeft--;
         executedHashes[_hash] = true;
+        emit CouponRedeemed(_couponCode, _redeemAddress, _salt, _price, updatedPrice);
         return updatedPrice;
     }
 
