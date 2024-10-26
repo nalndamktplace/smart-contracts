@@ -136,16 +136,48 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         }
     }
 
-    function mintPriceLatest() public view returns (uint256) {
+    struct DiscountData {
+        bytes32 couponCode;
+        uint256 salt;
+        bytes signature;
+    }
+
+    function mintPriceWithCoupon(address to, DiscountData calldata _discountData, bool _enforceDiscount)
+        private
+        returns (uint256)
+    {
         NalndaDiscounts discounts = NalndaDiscounts(marketplaceContract.nalndaDiscounts());
-        return mintPrice_;
+        if (_enforceDiscount) {
+            require(
+                discounts.canRedeemCoupon(
+                    to, mintPrice_, _discountData.couponCode, _discountData.signature, _discountData.salt
+                ),
+                "NalndaBook: Can't redeem coupon! Invalid or expired!"
+            );
+        }
+        uint256 price = discounts.redeemCoupon(
+            to, mintPrice_, _discountData.couponCode, _discountData.signature, _discountData.salt
+        );
+        return price;
+    }
+
+    function generateHashToSignForCoupon(bytes32 _couponCode, address _redeemAddress, uint256 _salt)
+        public
+        view
+        returns (bytes32 hash)
+    {
+        NalndaDiscounts discounts = NalndaDiscounts(marketplaceContract.nalndaDiscounts());
+        hash = discounts.generateHashToSignForCoupon(_couponCode, _redeemAddress, _salt);
     }
 
     //public method for minting new cover
-    function safeMint(address to) external marketplaceApproved {
+    function safeMint(address to, DiscountData calldata _discountData, bool enforceDiscount)
+        external
+        marketplaceApproved
+    {
         IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
         //transfer the minting cost to the contract
-        uint256 mintPrice = mintPriceLatest();
+        uint256 mintPrice = mintPriceWithCoupon(to, _discountData, enforceDiscount);
         purchaseToken.transferFrom(msg.sender, address(this), mintPrice);
         uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
         uint256 ownerShare = mintPrice - protocolPayout;
@@ -164,20 +196,23 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         airdrop.distributeTokensIfAny(to);
     }
 
-    function batchSafeMint(address[] memory addresses) external marketplaceApproved {
+    function batchSafeMint(address[] memory addresses, DiscountData[] calldata _discountDatas)
+        external
+        marketplaceApproved
+    {
+        require(addresses.length == _discountDatas.length, "NalndaBook: Invalid inputs!");
         IERC20 purchaseToken = IERC20(marketplaceContract.purchaseToken());
-        //transfer the minting cost to the contract
-        uint256 mintPrice = mintPriceLatest();
-        uint256 cost = mintPrice * addresses.length;
-        purchaseToken.transferFrom(_msgSender(), address(this), cost);
-        uint256 protocolPayout = (cost * protocolMintFee) / 100;
-        uint256 ownerShare = cost - protocolPayout;
-        //send commision to marketplaceContract
-        purchaseToken.transfer(address(marketplaceContract), protocolPayout);
-        //send author's share to the book owner
-        purchaseToken.transfer(owner(), ownerShare);
-        authorEarningsPaidout += ownerShare;
+
         for (uint256 i = 0; i < addresses.length; i++) {
+            uint256 mintPrice = mintPriceWithCoupon(addresses[i], _discountDatas[i], true);
+            purchaseToken.transferFrom(_msgSender(), address(this), mintPrice);
+            uint256 protocolPayout = (mintPrice * protocolMintFee) / 100;
+            uint256 ownerShare = mintPrice - protocolPayout;
+            //send commision to marketplaceContract
+            purchaseToken.transfer(address(marketplaceContract), protocolPayout);
+            //send author's share to the book owner
+            purchaseToken.transfer(owner(), ownerShare);
+            authorEarningsPaidout += ownerShare;
             _nextTokenId++;
             uint256 _tokenId = _nextTokenId;
             lastSoldPrice[_tokenId] = mintPrice;
