@@ -18,6 +18,8 @@ contract DeployNalndaMarketplace is Script {
         NalndaMarketplace marketplace = new NalndaMarketplace(purchaseToken, owner, authBookCreator);
         console.log("NalndaMarketplace deployed at:", address(marketplace));
 
+        console.log("NalndaDiscounts deployed at:", address(marketplace.nalndaDiscounts()));
+
         vm.stopBroadcast();
     }
 }
