@@ -7,8 +7,6 @@ import {NalndaDiscounts} from "../src/NalndaDiscounts.sol";
 import {NalndaBook} from "../src/NalndaBook.sol";
 import {MockUSDT} from "../src/tokens/mockUSDT.sol";
 
-// Use:  forge test -vv --via-ir
-
 contract TestContracts is Test {
     NalndaMarketplace marketplace;
     address bookOwnerAndCreator = vm.addr(1);

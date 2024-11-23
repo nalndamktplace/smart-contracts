@@ -4,8 +4,8 @@
 
 ```text
 MockUSDT: 0xdB899cC0CF97f3CEC81cA0ab72C7a3189E7e4555
-NalndaMarketplace deployed at: 0x66e9f29AF47f6e9a028A975B68f55dE981dDd1F4
-NalndaDiscounts deployed at: 0xaa5C1918164629B464e284f8257aa683108B5697
+NalndaMarketplace deployed at: 0xEA51091383a73C510E56860f97A89be347c04a9A
+NalndaDiscounts deployed at: 0xA39555647a37d6a422AeBD1300fEA25CAF76586B
 ```
 
 #### Deploy and verify MockUSDT for testing - polygon amoy
