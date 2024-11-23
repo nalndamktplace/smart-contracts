@@ -4,6 +4,7 @@ pragma solidity 0.8.27;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "./NalndaMarketplace.sol";
 
 contract NalndaDiscounts is Ownable {
     using MessageHashUtils for bytes32;
@@ -47,8 +48,8 @@ contract NalndaDiscounts is Ownable {
         bytes32 couponCode, address redeemAddress, uint256 _salt, uint256 originalPrice, uint256 discountPrice
     );
 
-    modifier onlyMarketplace() {
-        require(msg.sender == marketplace, "NalndaDiscounts: Only marketplace can call this function");
+    modifier onlyValidBook(address _book) {
+        require(NalndaMarketplace(marketplace).createdBooks(_book) == true, "NalndaDiscounts: Invalid caller");
         _;
     }
 
@@ -57,8 +58,10 @@ contract NalndaDiscounts is Ownable {
         uint256 _discountPercentage,
         uint256 _expiryTimestamp,
         uint256 _maxClaims
-    ) external onlyOwner {
-        require(nonce_global == UINT256_MAX, "NalndaDiscounts: No more discount coupons can be added");
+    ) external onlyOwner returns (bytes32) {
+        if (nonce_global == UINT256_MAX) {
+            revert("NalndaDiscounts: No more discount coupons can be added");
+        }
         require(
             _discountPercentage > 0 && _discountPercentage <= 100,
             "NalndaDiscounts: Discount percentage must be between 1 and 100"
@@ -79,6 +82,7 @@ contract NalndaDiscounts is Ownable {
         discountCoupons[_couponCode] =
             DiscountCoupon(_couponCode, _discountPercentage, _couponVerifyAddress, _expiryTimestamp, _maxClaims);
         emit CouponAdded(_couponCode, _discountPercentage, _couponVerifyAddress, _expiryTimestamp, _maxClaims);
+        return _couponCode;
     }
 
     function stopDiscountCoupon(bytes32 _couponCode) external onlyOwner {
@@ -102,7 +106,13 @@ contract NalndaDiscounts is Ownable {
         bytes32 _couponCode,
         bytes calldata _signature,
         uint256 _salt
-    ) external onlyMarketplace returns (uint256) {
+    ) external onlyValidBook(msg.sender) returns (uint256) {
+        if (
+            _couponCode == bytes32(0) || discountCoupons[_couponCode].discountPercentage == 0
+                || discountCoupons[_couponCode].claimsLeft == 0
+        ) {
+            return _price;
+        }
         bytes32 _hash = generateHashToSignForCoupon(_couponCode, _redeemAddress, _salt);
         uint256 updatedPrice = _getUpdatedPrice(_price, _couponCode, _signature, _hash);
         discountCoupons[_couponCode].claimsLeft--;
