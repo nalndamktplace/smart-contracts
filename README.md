@@ -8,14 +8,22 @@ NalndaMarketplace deployed at: 0xEA51091383a73C510E56860f97A89be347c04a9A
 NalndaDiscounts deployed at: 0xA39555647a37d6a422AeBD1300fEA25CAF76586B
 ```
 
-#### Deploy and verify MockUSDT for testing - polygon amoy
+### Latest addresses - base sepolia
 
-```shell
-forge script script/MockUSDT.s.sol --fork-url amoy --verify amoy --broadcast --slow
+```text
+MockUSDT: 0x090dD4074ff85AD0e73916dA05635705250969dc
+NalndaMarketplace deployed at: 0x642071d88e51ffAE9aD2694392B006425E7727Aa
+NalndaDiscounts deployed at: 0xa9A128E125C07D2b51bBf85CFA59156B4143E6b6
 ```
 
-#### Deploy the NalndaMarketplace contract - polygon amoy
+#### Deploy and verify MockUSDT for testing
 
 ```shell
-forge script script/NalndaMarketplace.s.sol --fork-url amoy --broadcast
+forge script script/MockUSDT.s.sol --fork-url [NETWORK_ALIAS] --verify amoy --broadcast --slow
+```
+
+#### Deploy the NalndaMarketplace contract
+
+```shell
+forge script script/NalndaMarketplace.s.sol --fork-url [NETWORK_ALIAS] --broadcast
 ```
