@@ -304,7 +304,8 @@ contract NalndaMarketplace is Ownable {
         IERC20 token = IERC20(_tokenAddress);
         uint256 bal = token.balanceOf(address(this));
         require(bal != 0, "NalndaMarketplace: Nothing to withdraw!");
-        token.transfer(owner(), bal);
+        bool success = token.transfer(owner(), bal);
+        require(success, "NalndaMarketplace: ERC20 Transfer failed!");
     }
 
     function withdrawAnyEth() external onlyOwner {

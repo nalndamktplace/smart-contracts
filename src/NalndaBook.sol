@@ -210,7 +210,8 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         IERC20 token = IERC20(_tokenAddress);
         uint256 bal = token.balanceOf(address(this));
         require(bal != 0, "NalndaBook: Nothing to withdraw!");
-        token.transfer(owner(), bal);
+        bool success = token.transfer(owner(), bal);
+        require(success, "NalndaBook: ERC20 Transfer failed!");
     }
 
     function withdrawAnyEth() external onlyOwner {
