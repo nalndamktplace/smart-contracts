@@ -4,16 +4,14 @@ pragma solidity 0.8.27;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "./NalndaBook.sol";
-import "./NalndaDiscounts.sol";
-import "./tokens/NalndaToken.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "./NalndaBook.sol";
 
 contract NalndaMarketplace is Ownable {
-    IERC20 public purchaseToken;
-    NalndaToken public immutable nalndaToken;
-    NalndaDiscounts public immutable nalndaDiscounts;
-    NalndaAirdrop public nalndaAirdrop;
+    using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
 
     mapping(address => address[]) public authorToBooks;
 
@@ -21,7 +19,6 @@ contract NalndaMarketplace is Ownable {
     uint256 public lastOrderId;
     uint256 public transferAfterDays;
     uint256 public secondarySaleAfterDays;
-    bool public publicBookCreationAllowed;
 
     enum Stage {
         UNLISTED,
@@ -44,7 +41,7 @@ contract NalndaMarketplace is Ownable {
     mapping(address => bool) public createdBooks;
 
     event NewBookCreated(
-        address indexed _author, address _bookAddress, string _coverURI, uint256 _price, uint256 _lang, uint256[] _genre
+        address indexed _author, address _bookAddress, string _coverUri, uint256 _price, uint256 _lang, uint256[] _genre
     );
     event CoverListed(
         uint256 indexed _orderId, address _lister, address indexed _book, uint256 indexed _tokenId, uint256 _price
@@ -60,37 +57,20 @@ contract NalndaMarketplace is Ownable {
     NalndaBook public immutable book_implementation;
     uint256 public immutable chainId;
     uint256 private extraSalt;
-
     address public authorizedBookCreator;
+    address public signerAddress;
+
+    mapping(bytes32 => bool) public executed;
 
     function setAuthorizedBookCreator(address _newCreator) external onlyOwner {
         authorizedBookCreator = _newCreator;
     }
 
-    function publicCreationAllowed() private view {
-        if (publicBookCreationAllowed == true) {
-            return;
-        }
-        require(
-            _msgSender() == authorizedBookCreator, "NalndaMarketplace: Only authorized book creator can create books!"
-        );
-    }
-
-    function allowPublicBookCreation() external onlyOwner {
-        publicBookCreationAllowed = true;
-    }
-
-    function changePurchaseToken(address _newToken) external onlyOwner {
-        require(_newToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
-        purchaseToken = IERC20(_newToken);
-    }
-
-    constructor(address _purchaseToken, address _initOwner, address _authBookCreator) Ownable(_initOwner) {
-        require(_purchaseToken != address(0), "NalndaMarketplace: PurchaseToken token's address can't be null!");
-        publicBookCreationAllowed = false;
-        purchaseToken = IERC20(_purchaseToken);
-        transferAfterDays = 21; //21 days
-        secondarySaleAfterDays = 21; //user should have owned cover for at least 21 days
+    constructor(address _initOwner, address _authBookCreator, address _signer) Ownable(_initOwner) {
+        //transferAfterDays = 21; //21 days
+        transferAfterDays = 0;
+        //secondarySaleAfterDays = 21; //user should have owned cover for at least 21 days
+        secondarySaleAfterDays = 0;
         totalBooksCreated = 0;
         lastOrderId = 0;
         extraSalt = 0;
@@ -100,10 +80,21 @@ contract NalndaMarketplace is Ownable {
         }
         chainId = _chainid;
         book_implementation = new NalndaBook(address(this));
-        nalndaAirdrop = new NalndaAirdrop(_initOwner, address(this));
-        nalndaDiscounts = new NalndaDiscounts(_initOwner, address(this));
-        nalndaToken = nalndaAirdrop.nalndaToken();
         authorizedBookCreator = _authBookCreator;
+        signerAddress = _signer;
+    }
+
+    function getHash(uint256 _nonce) public view returns (bytes32 hash) {
+        hash = keccak256(abi.encodePacked(address(this), chainId, _nonce));
+    }
+
+    function verifySignature(bytes calldata _sig, uint256 _nonce) public view returns (bool isValid) {
+        bytes32 ethSignedHash = getHash(_nonce).toEthSignedMessageHash();
+        isValid = (signerAddress == ethSignedHash.recover(_sig));
+    }
+
+    function setSignerAddress(address _newSignerAddress) external onlyOwner {
+        signerAddress = _newSignerAddress;
     }
 
     function changeTransferAfterDays(uint256 _days) external onlyOwner {
@@ -116,35 +107,45 @@ contract NalndaMarketplace is Ownable {
 
     function createNewBook(
         address _author,
-        string memory _coverURI,
+        string memory _coverUri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
-        uint256[] memory _genre
+        uint256[] memory _genre,
+        uint256 _nonce,
+        bytes calldata signature
     ) external returns (address _createdBook) {
-        publicCreationAllowed();
-        return _createNewBook(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
+        bytes32 hash = getHash(_nonce);
+        require(!executed[hash], "NalndaMarketplace: Hash has already been used!");
+        require(verifySignature(signature, _nonce), "NalndaMarketplace: Invalid signature!");
+        executed[hash] = true;
+        return _createNewBook(_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre);
     }
 
     function createNewBooks(
         address[] memory _author,
-        string[] memory _coverURI,
+        string[] memory _coverUri,
         uint256[] memory _initialPrice,
         uint256[] memory _daysForSecondarySales,
         uint256[] memory _lang,
-        uint256[][] memory _genre
+        uint256[][] memory _genre,
+        uint256 _nonce,
+        bytes calldata signature
     ) external returns (address[] memory) {
-        publicCreationAllowed();
         require(
-            _author.length == _coverURI.length && _coverURI.length == _initialPrice.length
-                && _initialPrice.length == _daysForSecondarySales.length && _daysForSecondarySales.length == _lang.length
-                && _lang.length == _genre.length,
+            _author.length == _coverUri.length && _coverUri.length == _initialPrice.length
+                && _initialPrice.length == _daysForSecondarySales.length
+                && _daysForSecondarySales.length == _lang.length && _lang.length == _genre.length,
             "NalndaMarketplace: Array lengths should be equal!"
         );
+        bytes32 hash = getHash(_nonce);
+        require(!executed[hash], "NalndaMarketplace: Hash has already been used!");
+        require(verifySignature(signature, _nonce), "NalndaMarketplace: Invalid signature!");
+        executed[hash] = true;
         address[] memory _createdBooks = new address[](_author.length);
         for (uint256 i = 0; i < _author.length; i++) {
             _createdBooks[i] = _createNewBook(
-                _author[i], _coverURI[i], _initialPrice[i], _daysForSecondarySales[i], _lang[i], _genre[i]
+                _author[i], _coverUri[i], _initialPrice[i], _daysForSecondarySales[i], _lang[i], _genre[i]
             );
         }
         return _createdBooks;
@@ -152,14 +153,14 @@ contract NalndaMarketplace is Ownable {
 
     function _createNewBook(
         address _author,
-        string memory _coverURI,
+        string memory _coverUri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256[] memory _genre
     ) private returns (address _createdBook) {
         require(_author != address(0), "NalndaMarketplace: Author address can't be null!");
-        require(bytes(_coverURI).length > 0, "NalndaMarketplace: Empty string passed as cover URI!");
+        require(bytes(_coverUri).length > 0, "NalndaMarketplace: Empty string passed as cover URI!");
         //require(
         //    _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
         //    "NalndaMarketplace: Days to secondary sales should be between 90 and 150!"
@@ -169,17 +170,17 @@ contract NalndaMarketplace is Ownable {
             require(_genre[i] >= 0 && _genre[i] < 100, "NalndaMarketplace: Book genre tag should be between 1 and 60!");
         }
         address _addressOutput =
-            _deployBookProxy(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre);
+            _deployBookProxy(_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
         createdBooks[_addressOutput] = true;
-        emit NewBookCreated(_author, _addressOutput, _coverURI, _initialPrice, _lang, _genre);
+        emit NewBookCreated(_author, _addressOutput, _coverUri, _initialPrice, _lang, _genre);
         return _addressOutput;
     }
 
     function _deployBookProxy(
         address _author,
-        string memory _coverURI,
+        string memory _coverUri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
@@ -189,40 +190,39 @@ contract NalndaMarketplace is Ownable {
         uint256 salt = uint256(
             keccak256(
                 abi.encodePacked(
-                    chainId, address(this), _author, _coverURI, _initialPrice, _lang, _genre.length, extraSalt
+                    chainId, address(this), _author, _coverUri, _initialPrice, _lang, _genre.length, extraSalt
                 )
             )
         );
         _deployedProxy = address(
             NalndaBook(
-                payable(
-                    new ERC1967Proxy{salt: bytes32(salt)}(
+                payable(new ERC1967Proxy{salt: bytes32(salt)}(
                         address(book_implementation),
                         abi.encodeCall(
                             NalndaBook.initialize,
-                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, nalndaAirdrop)
+                            (_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre)
                         )
-                    )
-                )
+                    ))
             )
         );
     }
 
     function computeNextBookAddress(
         address _author,
-        string memory _coverURI,
+        string memory _coverUri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
         uint256[] memory _genre
     ) public view returns (address _estimatedAddress) {
-        _estimatedAddress =
-            _computeBookAddress(_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, extraSalt + 1);
+        _estimatedAddress = _computeBookAddress(
+            _author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre, extraSalt + 1
+        );
     }
 
     function computeNextBooksAddresses(
         address[] memory _author,
-        string[] memory _coverURI,
+        string[] memory _coverUri,
         uint256[] memory _initialPrice,
         uint256[] memory _daysForSecondarySales,
         uint256[] memory _lang,
@@ -231,15 +231,15 @@ contract NalndaMarketplace is Ownable {
         uint256 _extraSalt = extraSalt;
         address[] memory _estimatedAddresses = new address[](_author.length);
         require(
-            _author.length == _coverURI.length && _coverURI.length == _initialPrice.length
-                && _initialPrice.length == _daysForSecondarySales.length && _daysForSecondarySales.length == _lang.length
-                && _lang.length == _genre.length,
+            _author.length == _coverUri.length && _coverUri.length == _initialPrice.length
+                && _initialPrice.length == _daysForSecondarySales.length
+                && _daysForSecondarySales.length == _lang.length && _lang.length == _genre.length,
             "NalndaMarketplace: Array lengths should be equal!"
         );
         for (uint256 i = 0; i < _author.length; i++) {
             _estimatedAddresses[i] = _computeBookAddress(
                 _author[i],
-                _coverURI[i],
+                _coverUri[i],
                 _initialPrice[i],
                 _daysForSecondarySales[i],
                 _lang[i],
@@ -252,7 +252,7 @@ contract NalndaMarketplace is Ownable {
 
     function _computeBookAddress(
         address _author,
-        string memory _coverURI,
+        string memory _coverUri,
         uint256 _initialPrice,
         uint256 _daysForSecondarySales,
         uint256 _lang,
@@ -262,7 +262,7 @@ contract NalndaMarketplace is Ownable {
         uint256 salt = uint256(
             keccak256(
                 abi.encodePacked(
-                    chainId, address(this), _author, _coverURI, _initialPrice, _lang, _genre.length, _extraSalt
+                    chainId, address(this), _author, _coverUri, _initialPrice, _lang, _genre.length, _extraSalt
                 )
             )
         );
@@ -276,7 +276,7 @@ contract NalndaMarketplace is Ownable {
                         address(book_implementation),
                         abi.encodeCall(
                             NalndaBook.initialize,
-                            (_author, _coverURI, _initialPrice, _daysForSecondarySales, _lang, _genre, nalndaAirdrop)
+                            (_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre)
                         )
                     )
                 )
@@ -300,18 +300,22 @@ contract NalndaMarketplace is Ownable {
         author = Ownable(_book).owner();
     }
 
-    function withdrawRevenue() external onlyOwner {
-        uint256 balance = getNALNDABalance();
+    function withdrawAnyERC20(address _tokenAddress) external onlyOwner {
+        IERC20 token = IERC20(_tokenAddress);
+        uint256 bal = token.balanceOf(address(this));
+        require(bal != 0, "NalndaMarketplace: Nothing to withdraw!");
+        token.transfer(owner(), bal);
+    }
+
+    function withdrawAnyEth() external onlyOwner {
+        uint256 balance = address(this).balance;
         require(balance != 0, "NalndaMarketplace: Nothing to withdraw!");
-        purchaseToken.transfer(owner(), balance);
-        emit RevenueWithdrawn(balance);
+        payable(owner()).transfer(balance);
     }
 
-    function getNALNDABalance() public view returns (uint256 bal) {
-        bal = purchaseToken.balanceOf((address(this)));
-    }
-
-    function listCover(NalndaBook _book, uint256 _tokenId, uint256 _price) external {
+    function listCover(NalndaBook _book, uint256 _tokenId, uint256 _price, uint256 _nonce, bytes calldata signature)
+        external
+    {
         //require(Address.isContract(address(_book)) == true, "NalndaMarketplace: Invalid book address!");
         require(_tokenId <= _book.coverIdCounter(), "NalndaMarketplace: Invalid tokenId provided!");
         require(_book.ownerOf(_tokenId) == _msgSender(), "NalndaMarketplace: Seller should own the NFT to list!");
@@ -319,23 +323,38 @@ contract NalndaMarketplace is Ownable {
         //    block.timestamp >= _book.secondarySalesTimestamp(),
         //    "NalndaMarketplace: Listing for this book is disabled!"
         //);
-        //require(
-        //    block.timestamp >= _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
-        //    "NalndaMarketplace: Can't list the cover at this time!"
-        //);
+        require(
+            block.timestamp >= _book.ownedAt(_tokenId) + secondarySaleAfterDays * 1 days,
+            "NalndaMarketplace: Can't list the cover at this time!"
+        );
+        bytes32 hash = getHash(_nonce);
+        require(!executed[hash], "NalndaMarketplace: Hash has already been used!");
+        require(verifySignature(signature, _nonce), "NalndaMarketplace: Invalid signature!");
+        executed[hash] = true;
         _book.marketplaceTransfer(_msgSender(), address(this), _tokenId);
         lastOrderId++;
-        ORDER[lastOrderId] = Order(Stage.LISTED, lastOrderId, _msgSender(), _book, _tokenId, _price);
+        ORDER[lastOrderId] = Order({
+            stage: Stage.LISTED,
+            orderId: lastOrderId,
+            seller: _msgSender(),
+            book: _book,
+            tokenId: _tokenId,
+            price: _price
+        });
         emit CoverListed(lastOrderId, _msgSender(), address(_book), _tokenId, _price);
     }
 
-    function unlistCover(uint256 _orderId) external {
+    function unlistCover(uint256 _orderId, uint256 _nonce, bytes calldata signature) external {
         require(_orderId <= lastOrderId, "NalndaMarketplace: Invalid order id!");
         require(ORDER[_orderId].stage == Stage.LISTED, "NalndaMarketplace: NFT not yet listed / already sold!");
         require(
             _msgSender() == ORDER[_orderId].seller || _msgSender() == owner(),
             "NalndaMarketplace: Only seller or marketplace admin can unlist!"
         );
+        bytes32 hash = getHash(_nonce);
+        require(!executed[hash], "NalndaMarketplace: Hash has already been used!");
+        require(verifySignature(signature, _nonce), "NalndaMarketplace: Invalid signature!");
+        executed[hash] = true;
         _msgSender() == ORDER[_orderId].seller
             ? ORDER[_orderId].stage = Stage.UNLISTED
             : ORDER[_orderId].stage = Stage.UNLISTED_BY_ADMIN;
@@ -346,18 +365,15 @@ contract NalndaMarketplace is Ownable {
         );
     }
 
-    function buyCover(uint256 _orderId) external {
+    function buyCover(uint256 _orderId, uint256 _nonce, bytes calldata signature) external {
         require(_orderId <= lastOrderId, "NalndaMarketplace: Invalid order id!");
         require(ORDER[_orderId].book.approved() == true, "NalndaMarketplace: Sales on this book are disabled!");
         require(ORDER[_orderId].stage == Stage.LISTED, "NalndaMarketplace: NFT not yet listed / already sold!");
+        bytes32 hash = getHash(_nonce);
+        require(!executed[hash], "NalndaMarketplace: Hash has already been used!");
+        require(verifySignature(signature, _nonce), "NalndaMarketplace: Invalid signature!");
+        executed[hash] = true;
         ORDER[_orderId].stage = Stage.SOLD; //to prevent reentrancy
-        purchaseToken.transferFrom(_msgSender(), address(this), ORDER[_orderId].price);
-        //send author commision
-        uint256 authorShare = (ORDER[_orderId].price * 10) / 100; //10% for author
-        purchaseToken.transfer(Ownable(address(ORDER[_orderId].book)).owner(), authorShare);
-        //send seller its share
-        uint256 sellerShare = (ORDER[_orderId].price * 88) / 100; //88% to the seller
-        purchaseToken.transfer(ORDER[_orderId].seller, sellerShare);
         //update last sold price
         ORDER[_orderId].book.updateLastSoldPrice(ORDER[_orderId].tokenId, ORDER[_orderId].price);
         //transfer NFT to the buyer
