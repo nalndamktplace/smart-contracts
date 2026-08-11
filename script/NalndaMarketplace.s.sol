@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: None
-pragma solidity 0.8.27;
+pragma solidity 0.8.36;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
