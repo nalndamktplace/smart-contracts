@@ -5,15 +5,30 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "./NalndaMarketplace.sol";
 
 contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     using ECDSA for bytes32;
-    using MessageHashUtils for bytes32;
+    using SafeERC20 for IERC20;
+
+    error InvalidTrustedForwarder();
+    error InvalidTokenAddress();
+    error UnauthorizedMarketplaceOwner();
+
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 private constant EIP712_NAME_HASH = keccak256("NalndaBook");
+    bytes32 private constant EIP712_VERSION_HASH = keccak256("1");
+    bytes32 private constant SAFE_MINT_TYPEHASH =
+        keccak256("SafeMint(address caller,address to,uint256 nonce,uint48 deadline)");
+    bytes32 private constant BATCH_SAFE_MINT_TYPEHASH =
+        keccak256("BatchSafeMint(address caller,bytes32 addressesHash,uint256 nonce,uint48 deadline)");
 
     mapping(bytes32 => bool) public executed;
     uint256 public immutable chainId;
@@ -30,8 +45,6 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
 
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
-    //token id => timestamp of last transfer
-    mapping(uint256 => uint256) public ownedAt;
 
     modifier onlyMarketplace() {
         require(_msgSender() == address(marketplaceContract));
@@ -54,6 +67,14 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
 
     function coverIdCounter() public view returns (uint256) {
         return _nextTokenId;
+    }
+
+    function name() public pure override returns (string memory) {
+        return "NalndaBookCover";
+    }
+
+    function symbol() public pure override returns (string memory) {
+        return "COVER";
     }
 
     function initialize(
@@ -79,7 +100,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         secondarySalesTimestamp = 2 ** 256 - 1;
         bookLang = _lang;
         bookGenre = _genre;
-        marketplaceContract = NalndaMarketplace(_msgSender());
+        marketplaceContract = NalndaMarketplace(msg.sender);
         _transferOwnership(_author);
         uri = string(_uri);
         mintPrice = _initialPrice;
@@ -97,7 +118,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        require(tokenId > 0 && tokenId <= _nextTokenId, "NalndaBook: URI query for nonexistent token");
+        _requireOwned(tokenId);
         return uri;
     }
 
@@ -109,7 +130,6 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     function ownerMint(address to) external onlyOwner marketplaceApproved {
         _nextTokenId++;
         uint256 tokenId = _nextTokenId;
-        ownedAt[tokenId] = block.timestamp;
         if (to != owner()) {
             //first mint for author then transfer
             _safeMint(owner(), tokenId);
@@ -123,7 +143,6 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         for (uint256 i = 0; i < addresses.length; i++) {
             _nextTokenId++;
             uint256 tokenId = _nextTokenId;
-            ownedAt[tokenId] = block.timestamp;
             if (addresses[i] != owner()) {
                 //first mint for author then transfer
                 _safeMint(owner(), tokenId);
@@ -134,45 +153,54 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         }
     }
 
-    function getHash(uint256 _nonce) public view returns (bytes32 hash) {
-        hash = keccak256(abi.encodePacked(address(this), chainId, _nonce));
-    }
-
-    function verifySignature(bytes calldata _sig, uint256 _nonce) public view returns (bool isValid) {
-        bytes32 ethSignedHash = getHash(_nonce).toEthSignedMessageHash();
-        isValid = (marketplaceContract.signerAddress() == ethSignedHash.recover(_sig));
+    function _authorize(bytes32 _structHash, uint48 _deadline, bytes calldata _signature) private {
+        require(block.timestamp <= _deadline, "NalndaBook: Signature expired!");
+        bytes32 domainSeparator = keccak256(
+            abi.encode(EIP712_DOMAIN_TYPEHASH, EIP712_NAME_HASH, EIP712_VERSION_HASH, block.chainid, address(this))
+        );
+        bytes32 digest = MessageHashUtils.toTypedDataHash(domainSeparator, _structHash);
+        require(!executed[digest], "NalndaBook: Hash has already been used!");
+        require(marketplaceContract.signerAddress() == digest.recover(_signature), "NalndaBook: Invalid signature!");
+        executed[digest] = true;
     }
 
     //public method for minting new cover
-    function safeMint(address to, uint256 _nonce, bytes calldata signature) external marketplaceApproved {
-        bytes32 hash = getHash(_nonce);
-        require(!executed[hash], "NalndaBook: Hash has already been used!");
-        require(verifySignature(signature, _nonce), "NalndaBook: Invalid signature!");
-        executed[hash] = true;
+    function safeMint(address to, uint256 _nonce, uint48 _deadline, bytes calldata signature)
+        external
+        marketplaceApproved
+    {
+        _authorize(keccak256(abi.encode(SAFE_MINT_TYPEHASH, _msgSender(), to, _nonce, _deadline)), _deadline, signature);
         _nextTokenId++;
         uint256 _tokenId = _nextTokenId;
         lastSoldPrice[_tokenId] = mintPrice;
-        ownedAt[_tokenId] = block.timestamp;
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
     }
 
-    function batchSafeMint(address[] memory addresses, uint256 _nonce, bytes calldata signature)
+    function batchSafeMint(address[] memory addresses, uint256 _nonce, uint48 _deadline, bytes calldata signature)
         external
         marketplaceApproved
     {
-        bytes32 hash = getHash(_nonce);
-        require(!executed[hash], "NalndaBook: Hash has already been used!");
-        require(verifySignature(signature, _nonce), "NalndaBook: Invalid signature!");
-        executed[hash] = true;
+        bytes32 addressesHash = keccak256(abi.encode(addresses));
+        _authorize(
+            keccak256(abi.encode(BATCH_SAFE_MINT_TYPEHASH, _msgSender(), addressesHash, _nonce, _deadline)),
+            _deadline,
+            signature
+        );
         for (uint256 i = 0; i < addresses.length; i++) {
             _nextTokenId++;
             uint256 _tokenId = _nextTokenId;
             lastSoldPrice[_tokenId] = mintPrice;
-            ownedAt[_tokenId] = block.timestamp;
             _safeMint(owner(), _tokenId);
             _transfer(owner(), addresses[i], _tokenId);
         }
+    }
+
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        if (marketplaceContract.paused() && _msgSender() != address(marketplaceContract)) {
+            revert NalndaMarketplace.MarketplacePaused();
+        }
+        return super._update(to, tokenId, auth);
     }
 
     function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
@@ -181,16 +209,10 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         override
         marketplaceApproved
     {
-        require(
-            block.timestamp >= ownedAt[tokenId] + marketplaceContract.transferAfterDays() * 1 days,
-            "NalndaBook: Transfer not allowed!"
-        );
-        ownedAt[tokenId] = block.timestamp;
         super.safeTransferFrom(from, to, tokenId, data);
     }
 
     function marketplaceTransfer(address _from, address _to, uint256 _tokenId) external onlyMarketplace {
-        ownedAt[_tokenId] = block.timestamp;
         _transfer(_from, _to, _tokenId);
     }
 
@@ -198,7 +220,9 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         lastSoldPrice[_tokenId] = _price;
     }
 
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal view override {
+        if (_msgSender() != marketplaceContract.owner()) revert UnauthorizedMarketplaceOwner();
+        if (!marketplaceContract.paused()) revert NalndaMarketplace.MarketplaceNotPaused();
         (newImplementation);
     }
 
@@ -206,17 +230,44 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         revert("NalndaBook: Ownership of a book cannot be renounced!");
     }
 
+    function trustedForwarder() public view returns (address) {
+        return marketplaceContract.trustedForwarder();
+    }
+
+    function isTrustedForwarder(address forwarder) public view returns (bool) {
+        return forwarder == trustedForwarder();
+    }
+
+    function _msgSender() internal view override(Context) returns (address) {
+        if (msg.data.length >= _contextSuffixLength() && isTrustedForwarder(msg.sender)) {
+            return address(bytes20(msg.data[msg.data.length - _contextSuffixLength():]));
+        }
+        return super._msgSender();
+    }
+
+    function _msgData() internal view override(Context) returns (bytes calldata) {
+        if (msg.data.length >= _contextSuffixLength() && isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - _contextSuffixLength()];
+        }
+        return super._msgData();
+    }
+
+    function _contextSuffixLength() internal pure override(Context) returns (uint256) {
+        return 20;
+    }
+
     function withdrawAnyERC20(address _tokenAddress) external onlyOwner {
+        if (_tokenAddress == address(0)) revert InvalidTokenAddress();
         IERC20 token = IERC20(_tokenAddress);
         uint256 bal = token.balanceOf(address(this));
         require(bal != 0, "NalndaBook: Nothing to withdraw!");
-        bool success = token.transfer(owner(), bal);
-        require(success, "NalndaBook: ERC20 Transfer failed!");
+        token.safeTransfer(owner(), bal);
     }
 
     function withdrawAnyEth() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance != 0, "NalndaBook: Nothing to withdraw!");
-        payable(owner()).transfer(balance);
+        (bool success,) = payable(owner()).call{value: balance}("");
+        require(success, "NalndaBook: ETH Transfer failed!");
     }
 }

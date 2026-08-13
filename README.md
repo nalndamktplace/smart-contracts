@@ -24,6 +24,8 @@ NalndaDiscounts deployed at: 0xa9A128E125C07D2b51bBf85CFA59156B4143E6b6
 
 #### Deploy the NalndaMarketplace contract
 
+The default deployment disables ERC-2771 forwarding by setting the trusted forwarder to `address(0)`. Direct calls and ERC-4337 UserOperations do not require an ERC-2771 forwarder. The marketplace owner can enable one later with `setTrustedForwarder`.
+
 ```shell
 forge script script/NalndaMarketplace.s.sol --fork-url [NETWORK_ALIAS] --broadcast
 ```
