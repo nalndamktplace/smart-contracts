@@ -3,7 +3,7 @@
 ### Latest addresses - base sepolia
 
 ```text
-NalndaMarketplace deployed at: 0xc7862b3759B20bEd2EA1384fF12392c86d5b008D
+NalndaMarketplace deployed at: 0x771bf76fAC40935e6525572341407e417245F649
 ```
 
 ### Legacy addresses - polygon amoy
