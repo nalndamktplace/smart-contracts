@@ -3,7 +3,10 @@
 ### Latest addresses - base sepolia
 
 ```text
-NalndaMarketplace deployed at: 0x771bf76fAC40935e6525572341407e417245F649
+NalndaMarketplace implementation deployed at: 0x9Ef594f8791202e9f0B6Fa575d1701CC9E9262aE
+NalndaMarketplace deployed at: 0xa2aEe69f8c15C3757c6ad8032d4Ab4E99E4a7837
+NalndaSCW implementation deployed at: 0x09358EF316C673b02EA34e0f1b0e38e8848A2731
+NalndaSCWFactory deployed at: 0x3eb3B6537b725a3Ec6F0aabc6EF5cfCE39eFd692
 ```
 
 ### Legacy addresses - polygon amoy
@@ -22,7 +25,9 @@ NalndaMarketplace deployed at: 0x642071d88e51ffAE9aD2694392B006425E7727Aa
 NalndaDiscounts deployed at: 0xa9A128E125C07D2b51bBf85CFA59156B4143E6b6
 ```
 
-#### Deploy the NalndaMarketplace contract
+#### Deploy the Nalnda contracts
+
+The script deploys `NalndaSCWFactory` and its implementation. The smart contract wallet uses account-abstraction v0.7 and Alchemy's EntryPoint at `0x0000000071727De22E5E9d8BAf0edAc6f37da032`.
 
 The default deployment disables ERC-2771 forwarding by setting the trusted forwarder to `address(0)`. Direct calls and ERC-4337 UserOperations do not require an ERC-2771 forwarder. The marketplace owner can enable one later with `setTrustedForwarder`.
 

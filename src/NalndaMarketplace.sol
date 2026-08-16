@@ -20,7 +20,6 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
     error MarketplacePaused();
     error MarketplaceNotPaused();
     error InvalidSignerAddress();
-    error InvalidAuthorizedBookCreator();
     error InvalidTrustedForwarder();
     error InvalidTokenAddress();
     error UnknownBook();
@@ -30,11 +29,6 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
     bytes32 private constant EIP712_NAME_HASH = keccak256("NalndaMarketplace");
     bytes32 private constant EIP712_VERSION_HASH = keccak256("1");
 
-    bytes32 private constant CREATE_NEW_BOOK_TYPEHASH = keccak256(
-        "CreateNewBook(address caller,address author,bytes32 coverUriHash,uint256 initialPrice,uint256 daysForSecondarySales,uint256 lang,bytes32 genreHash,uint256 nonce,uint48 deadline)"
-    );
-    bytes32 private constant CREATE_NEW_BOOKS_TYPEHASH =
-        keccak256("CreateNewBooks(address caller,bytes32 argumentsHash,uint256 nonce,uint48 deadline)");
     bytes32 private constant LIST_COVER_TYPEHASH =
         keccak256("ListCover(address seller,address book,uint256 tokenId,uint256 price,uint256 nonce,uint48 deadline)");
     bytes32 private constant UNLIST_COVER_TYPEHASH =
@@ -67,9 +61,7 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
 
     mapping(address => bool) public createdBooks;
 
-    event NewBookCreated(
-        address indexed _author, address _bookAddress, string _coverUri, uint256 _price, uint256 _lang, uint256[] _genre
-    );
+    event NewBookCreated(address indexed _author, address _bookAddress, string _coverUri);
     event CoverListed(
         uint256 indexed _orderId, address _lister, address indexed _book, uint256 indexed _tokenId, uint256 _price
     );
@@ -82,13 +74,14 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
     event RevenueWithdrawn(uint256 _revenueWithdrawn);
     event Paused(address indexed account);
     event Unpaused(address indexed account);
+    event BookPaused(address indexed book);
+    event BookUnpaused(address indexed book);
     event SignerAddressUpdated(address indexed previousSigner, address indexed newSigner);
     event TrustedForwarderUpdated(address indexed previousForwarder, address indexed newForwarder);
 
     NalndaBook public immutable book_implementation;
     uint256 public immutable chainId;
     uint256 private extraSalt;
-    address public authorizedBookCreator;
     address public signerAddress;
     bool public paused;
 
@@ -98,11 +91,6 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
     modifier whenNotPaused() {
         if (paused) revert MarketplacePaused();
         _;
-    }
-
-    function setAuthorizedBookCreator(address _newCreator) external onlyOwner {
-        if (_newCreator == address(0)) revert InvalidAuthorizedBookCreator();
-        authorizedBookCreator = _newCreator;
     }
 
     function pause() external onlyOwner {
@@ -127,16 +115,11 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
         book_implementation = new NalndaBook(address(this));
     }
 
-    function initialize(address _initOwner, address _authBookCreator, address _signer, address _trustedForwarder)
-        external
-        initializer
-    {
+    function initialize(address _initOwner, address _signer, address _trustedForwarder) external initializer {
         if (_initOwner == address(0)) revert OwnableInvalidOwner(address(0));
         if (_signer == address(0)) revert InvalidSignerAddress();
-        if (_authBookCreator == address(0)) revert InvalidAuthorizedBookCreator();
         _validateTrustedForwarder(_trustedForwarder);
         _transferOwnership(_initOwner);
-        authorizedBookCreator = _authBookCreator;
         signerAddress = _signer;
         trustedForwarder = _trustedForwarder;
     }
@@ -180,186 +163,78 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
         emit SignerAddressUpdated(previousSigner, _newSignerAddress);
     }
 
-    function createNewBook(
-        address _author,
-        string memory _coverUri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre,
-        uint256 _nonce,
-        uint48 _deadline,
-        bytes calldata signature
-    ) external whenNotPaused returns (address _createdBook) {
-        _authorize(
-            keccak256(
-                abi.encode(
-                    CREATE_NEW_BOOK_TYPEHASH,
-                    _msgSender(),
-                    _author,
-                    keccak256(bytes(_coverUri)),
-                    _initialPrice,
-                    _daysForSecondarySales,
-                    _lang,
-                    keccak256(abi.encode(_genre)),
-                    _nonce,
-                    _deadline
-                )
-            ),
-            _deadline,
-            signature
-        );
-        return _createNewBook(_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre);
+    function createNewBook(address _author, string memory _coverUri)
+        external
+        whenNotPaused
+        returns (address _createdBook)
+    {
+        return _createNewBook(_author, _coverUri);
     }
 
-    function createNewBooks(
-        address[] memory _author,
-        string[] memory _coverUri,
-        uint256[] memory _initialPrice,
-        uint256[] memory _daysForSecondarySales,
-        uint256[] memory _lang,
-        uint256[][] memory _genre,
-        uint256 _nonce,
-        uint48 _deadline,
-        bytes calldata signature
-    ) external whenNotPaused returns (address[] memory) {
-        require(
-            _author.length == _coverUri.length && _coverUri.length == _initialPrice.length
-                && _initialPrice.length == _daysForSecondarySales.length
-                && _daysForSecondarySales.length == _lang.length && _lang.length == _genre.length,
-            "NalndaMarketplace: Array lengths should be equal!"
-        );
-        bytes32 argumentsHash =
-            keccak256(abi.encode(_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre));
-        _authorize(
-            keccak256(abi.encode(CREATE_NEW_BOOKS_TYPEHASH, _msgSender(), argumentsHash, _nonce, _deadline)),
-            _deadline,
-            signature
-        );
+    function createNewBooks(address[] memory _author, string[] memory _coverUri)
+        external
+        whenNotPaused
+        returns (address[] memory)
+    {
+        require(_author.length == _coverUri.length, "NalndaMarketplace: Array lengths should be equal!");
         address[] memory _createdBooks = new address[](_author.length);
         for (uint256 i = 0; i < _author.length; i++) {
-            _createdBooks[i] = _createNewBook(
-                _author[i], _coverUri[i], _initialPrice[i], _daysForSecondarySales[i], _lang[i], _genre[i]
-            );
+            _createdBooks[i] = _createNewBook(_author[i], _coverUri[i]);
         }
         return _createdBooks;
     }
 
-    function _createNewBook(
-        address _author,
-        string memory _coverUri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre
-    ) private returns (address _createdBook) {
+    function _createNewBook(address _author, string memory _coverUri) private returns (address _createdBook) {
         require(_author != address(0), "NalndaMarketplace: Author address can't be null!");
         require(bytes(_coverUri).length > 0, "NalndaMarketplace: Empty string passed as cover URI!");
-        //require(
-        //    _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
-        //    "NalndaMarketplace: Days to secondary sales should be between 90 and 150!"
-        //);
-        require(_lang >= 0 && _lang < 100, "NalndaMarketplace: Book language tag should be between 1 and 100!");
-        for (uint256 i = 0; i < _genre.length; i++) {
-            require(_genre[i] >= 0 && _genre[i] < 100, "NalndaMarketplace: Book genre tag should be between 1 and 60!");
-        }
-        address _addressOutput =
-            _deployBookProxy(_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre);
+        address _addressOutput = _deployBookProxy(_author, _coverUri);
         authorToBooks[_msgSender()].push(_addressOutput);
         totalBooksCreated++;
         createdBooks[_addressOutput] = true;
-        emit NewBookCreated(_author, _addressOutput, _coverUri, _initialPrice, _lang, _genre);
+        emit NewBookCreated(_author, _addressOutput, _coverUri);
         return _addressOutput;
     }
 
-    function _deployBookProxy(
-        address _author,
-        string memory _coverUri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre
-    ) private returns (address _deployedProxy) {
+    function _deployBookProxy(address _author, string memory _coverUri) private returns (address _deployedProxy) {
         extraSalt = extraSalt + 1;
-        uint256 salt = uint256(
-            keccak256(
-                abi.encodePacked(
-                    chainId, address(this), _author, _coverUri, _initialPrice, _lang, _genre.length, extraSalt
-                )
-            )
-        );
+        uint256 salt = uint256(keccak256(abi.encodePacked(chainId, address(this), _author, _coverUri, extraSalt)));
         _deployedProxy = address(
             NalndaBook(
                 payable(new ERC1967Proxy{salt: bytes32(salt)}(
-                        address(book_implementation),
-                        abi.encodeCall(
-                            NalndaBook.initialize,
-                            (_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre)
-                        )
+                        address(book_implementation), abi.encodeCall(NalndaBook.initialize, (_author, _coverUri))
                     ))
             )
         );
     }
 
-    function computeNextBookAddress(
-        address _author,
-        string memory _coverUri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre
-    ) public view returns (address _estimatedAddress) {
-        _estimatedAddress = _computeBookAddress(
-            _author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre, extraSalt + 1
-        );
+    function computeNextBookAddress(address _author, string memory _coverUri)
+        public
+        view
+        returns (address _estimatedAddress)
+    {
+        _estimatedAddress = _computeBookAddress(_author, _coverUri, extraSalt + 1);
     }
 
-    function computeNextBooksAddresses(
-        address[] memory _author,
-        string[] memory _coverUri,
-        uint256[] memory _initialPrice,
-        uint256[] memory _daysForSecondarySales,
-        uint256[] memory _lang,
-        uint256[][] memory _genre
-    ) public view returns (address[] memory) {
+    function computeNextBooksAddresses(address[] memory _author, string[] memory _coverUri)
+        public
+        view
+        returns (address[] memory)
+    {
         uint256 _extraSalt = extraSalt;
         address[] memory _estimatedAddresses = new address[](_author.length);
-        require(
-            _author.length == _coverUri.length && _coverUri.length == _initialPrice.length
-                && _initialPrice.length == _daysForSecondarySales.length
-                && _daysForSecondarySales.length == _lang.length && _lang.length == _genre.length,
-            "NalndaMarketplace: Array lengths should be equal!"
-        );
+        require(_author.length == _coverUri.length, "NalndaMarketplace: Array lengths should be equal!");
         for (uint256 i = 0; i < _author.length; i++) {
-            _estimatedAddresses[i] = _computeBookAddress(
-                _author[i],
-                _coverUri[i],
-                _initialPrice[i],
-                _daysForSecondarySales[i],
-                _lang[i],
-                _genre[i],
-                _extraSalt + i + 1
-            );
+            _estimatedAddresses[i] = _computeBookAddress(_author[i], _coverUri[i], _extraSalt + i + 1);
         }
         return _estimatedAddresses;
     }
 
-    function _computeBookAddress(
-        address _author,
-        string memory _coverUri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre,
-        uint256 _extraSalt
-    ) private view returns (address _estimatedAddress) {
-        uint256 salt = uint256(
-            keccak256(
-                abi.encodePacked(
-                    chainId, address(this), _author, _coverUri, _initialPrice, _lang, _genre.length, _extraSalt
-                )
-            )
-        );
+    function _computeBookAddress(address _author, string memory _coverUri, uint256 _extraSalt)
+        private
+        view
+        returns (address _estimatedAddress)
+    {
+        uint256 salt = uint256(keccak256(abi.encodePacked(chainId, address(this), _author, _coverUri, _extraSalt)));
 
         _estimatedAddress = Create2.computeAddress(
             bytes32(salt),
@@ -367,26 +242,40 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
                 abi.encodePacked(
                     type(ERC1967Proxy).creationCode,
                     abi.encode(
-                        address(book_implementation),
-                        abi.encodeCall(
-                            NalndaBook.initialize,
-                            (_author, _coverUri, _initialPrice, _daysForSecondarySales, _lang, _genre)
-                        )
+                        address(book_implementation), abi.encodeCall(NalndaBook.initialize, (_author, _coverUri))
                     )
                 )
             )
         );
     }
 
-    function approveBooks(address[] memory _books) public onlyOwner {
+    function pauseBook(address _book) external onlyOwner {
+        _setBookPaused(_book, true);
+    }
+
+    function unpauseBook(address _book) external onlyOwner {
+        _setBookPaused(_book, false);
+    }
+
+    function pauseBooks(address[] memory _books) external onlyOwner {
         for (uint256 i = 0; i < _books.length; i++) {
-            NalndaBook(_books[i]).changeApproval(true);
+            _setBookPaused(_books[i], true);
         }
     }
 
-    function unapproveBooks(address[] memory _books) external onlyOwner {
+    function unpauseBooks(address[] memory _books) external onlyOwner {
         for (uint256 i = 0; i < _books.length; i++) {
-            NalndaBook(_books[i]).changeApproval(false);
+            _setBookPaused(_books[i], false);
+        }
+    }
+
+    function _setBookPaused(address _book, bool shouldPause) private {
+        if (!createdBooks[_book]) revert UnknownBook();
+        NalndaBook(payable(_book)).setPaused(shouldPause);
+        if (shouldPause) {
+            emit BookPaused(_book);
+        } else {
+            emit BookUnpaused(_book);
         }
     }
 
@@ -418,6 +307,7 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
         bytes calldata signature
     ) external whenNotPaused {
         if (!createdBooks[address(_book)]) revert UnknownBook();
+        if (_book.paused()) revert NalndaBook.BookIsPaused();
         require(_tokenId <= _book.coverIdCounter(), "NalndaMarketplace: Invalid tokenId provided!");
         require(_book.ownerOf(_tokenId) == _msgSender(), "NalndaMarketplace: Seller should own the NFT to list!");
         _authorize(
@@ -467,7 +357,7 @@ contract NalndaMarketplace is Ownable, Initializable, UUPSUpgradeable {
         whenNotPaused
     {
         require(_orderId <= lastOrderId, "NalndaMarketplace: Invalid order id!");
-        require(ORDER[_orderId].book.approved() == true, "NalndaMarketplace: Sales on this book are disabled!");
+        if (ORDER[_orderId].book.paused()) revert NalndaBook.BookIsPaused();
         require(ORDER[_orderId].stage == Stage.LISTED, "NalndaMarketplace: NFT not yet listed / already sold!");
         _authorize(
             keccak256(abi.encode(BUY_COVER_TYPEHASH, _msgSender(), _orderId, _nonce, _deadline)), _deadline, signature

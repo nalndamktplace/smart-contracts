@@ -1,0 +1,11 @@
+{
+  "lib/account-abstraction": {
+    "rev": "7af70c8993a6f42973f520ae0752386a5032abe7"
+  },
+  "lib/forge-std": {
+    "rev": "467ffd422ca01fed5797a4c766a1e4e3a5327902"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "21687a56b7cc81346b3e5fa96bda37e2003b2f0e"
+  }
+}

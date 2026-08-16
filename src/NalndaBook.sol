@@ -20,6 +20,8 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     error InvalidTrustedForwarder();
     error InvalidTokenAddress();
     error UnauthorizedMarketplaceOwner();
+    error BookIsPaused();
+    error BookNotPaused();
 
     bytes32 private constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
@@ -35,24 +37,14 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
 
     uint256 private _nextTokenId;
     NalndaMarketplace public marketplaceContract;
-    bool public approved;
-    uint256 public daysForSecondarySales;
-    uint256 public secondarySalesTimestamp;
-    uint256 public bookLang;
-    uint256[] public bookGenre;
+    bool public paused;
     string public uri;
-    uint256 public mintPrice;
 
     // token id => last sale price
     mapping(uint256 => uint256) public lastSoldPrice;
 
     modifier onlyMarketplace() {
         require(_msgSender() == address(marketplaceContract));
-        _;
-    }
-
-    modifier marketplaceApproved() {
-        require(approved == true, "NalndaBook: Book unapproved from marketplace!");
         _;
     }
 
@@ -77,44 +69,21 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         return "COVER";
     }
 
-    function initialize(
-        address _author,
-        string memory _uri,
-        uint256 _initialPrice,
-        uint256 _daysForSecondarySales,
-        uint256 _lang,
-        uint256[] memory _genre
-    ) public virtual initializer {
+    function initialize(address _author, string memory _uri) public virtual initializer {
         require(_author != address(0), "NalndaBook: Author's address can't be null!");
         require(bytes(_uri).length > 0, "NalndaBook: Empty string passed as cover URI!!!");
-        require(
-            _daysForSecondarySales >= 90 && _daysForSecondarySales <= 150,
-            "NalndaBook: Days to secondary sales should be between 90 and 150!"
-        );
-        require(_lang >= 0 && _lang < 100, "NalndaBook: Book language tag should be between 1 and 100!");
-        for (uint256 i = 0; i < _genre.length; i++) {
-            require(_genre[i] >= 0 && _genre[i] < 100, "NalndaBook: Book genre tag should be between 1 and 60!");
-        }
-        approved = true; // for testing -- should be false in production
-        daysForSecondarySales = _daysForSecondarySales;
-        secondarySalesTimestamp = 2 ** 256 - 1;
-        bookLang = _lang;
-        bookGenre = _genre;
         marketplaceContract = NalndaMarketplace(msg.sender);
         _transferOwnership(_author);
         uri = string(_uri);
-        mintPrice = _initialPrice;
     }
 
-    function changeApproval(bool _newApproved) external onlyMarketplace {
-        if (_newApproved == true) {
-            require(approved == false, "NalndaBook: Already approved!");
-            secondarySalesTimestamp = block.timestamp + daysForSecondarySales * 1 days;
-        } else {
-            require(approved == true, "NalndaBook: Already unapproved!");
-            secondarySalesTimestamp = 2 ** 256 - 1;
+    function setPaused(bool shouldPause) external onlyMarketplace {
+        if (shouldPause) {
+            if (paused) revert BookIsPaused();
+        } else if (!paused) {
+            revert BookNotPaused();
         }
-        approved = _newApproved;
+        paused = shouldPause;
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
@@ -122,12 +91,8 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         return uri;
     }
 
-    function changeMintPrice(uint256 _newPrice) external onlyOwner {
-        mintPrice = _newPrice;
-    }
-
     //owner should be able to mint for free at any point
-    function ownerMint(address to) external onlyOwner marketplaceApproved {
+    function ownerMint(address to) external onlyOwner {
         _nextTokenId++;
         uint256 tokenId = _nextTokenId;
         if (to != owner()) {
@@ -139,7 +104,7 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         }
     }
 
-    function batchOwnerMint(address[] memory addresses) external onlyOwner marketplaceApproved {
+    function batchOwnerMint(address[] memory addresses) external onlyOwner {
         for (uint256 i = 0; i < addresses.length; i++) {
             _nextTokenId++;
             uint256 tokenId = _nextTokenId;
@@ -165,21 +130,16 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
     }
 
     //public method for minting new cover
-    function safeMint(address to, uint256 _nonce, uint48 _deadline, bytes calldata signature)
-        external
-        marketplaceApproved
-    {
+    function safeMint(address to, uint256 _nonce, uint48 _deadline, bytes calldata signature) external {
         _authorize(keccak256(abi.encode(SAFE_MINT_TYPEHASH, _msgSender(), to, _nonce, _deadline)), _deadline, signature);
         _nextTokenId++;
         uint256 _tokenId = _nextTokenId;
-        lastSoldPrice[_tokenId] = mintPrice;
         _safeMint(owner(), _tokenId);
         _transfer(owner(), to, _tokenId);
     }
 
     function batchSafeMint(address[] memory addresses, uint256 _nonce, uint48 _deadline, bytes calldata signature)
         external
-        marketplaceApproved
     {
         bytes32 addressesHash = keccak256(abi.encode(addresses));
         _authorize(
@@ -190,26 +150,17 @@ contract NalndaBook is ERC721, Ownable, Initializable, UUPSUpgradeable {
         for (uint256 i = 0; i < addresses.length; i++) {
             _nextTokenId++;
             uint256 _tokenId = _nextTokenId;
-            lastSoldPrice[_tokenId] = mintPrice;
             _safeMint(owner(), _tokenId);
             _transfer(owner(), addresses[i], _tokenId);
         }
     }
 
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        if (marketplaceContract.paused() && _msgSender() != address(marketplaceContract)) {
-            revert NalndaMarketplace.MarketplacePaused();
+        if (_msgSender() != address(marketplaceContract)) {
+            if (marketplaceContract.paused()) revert NalndaMarketplace.MarketplacePaused();
+            if (paused) revert BookIsPaused();
         }
         return super._update(to, tokenId, auth);
-    }
-
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data)
-        public
-        virtual
-        override
-        marketplaceApproved
-    {
-        super.safeTransferFrom(from, to, tokenId, data);
     }
 
     function marketplaceTransfer(address _from, address _to, uint256 _tokenId) external onlyMarketplace {

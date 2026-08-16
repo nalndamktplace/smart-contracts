@@ -38,9 +38,6 @@ contract SignatureAuthorizationTest is Test {
     uint256 private constant USER_PRIVATE_KEY = 0xB0B;
     bytes32 private constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 private constant CREATE_NEW_BOOK_TYPEHASH = keccak256(
-        "CreateNewBook(address caller,address author,bytes32 coverUriHash,uint256 initialPrice,uint256 daysForSecondarySales,uint256 lang,bytes32 genreHash,uint256 nonce,uint48 deadline)"
-    );
     bytes32 private constant LIST_COVER_TYPEHASH =
         keccak256("ListCover(address seller,address book,uint256 tokenId,uint256 price,uint256 nonce,uint48 deadline)");
     bytes32 private constant UNLIST_COVER_TYPEHASH =
@@ -70,61 +67,12 @@ contract SignatureAuthorizationTest is Test {
             payable(address(
                     new ERC1967Proxy(
                         address(implementation),
-                        abi.encodeCall(
-                            NalndaMarketplace.initialize, (address(this), address(this), signer, address(forwarder))
-                        )
+                        abi.encodeCall(NalndaMarketplace.initialize, (address(this), signer, address(forwarder)))
                     )
                 ))
         );
 
-        uint256[] memory genre = new uint256[](1);
-        genre[0] = 1;
-        bytes memory signature = _sign(
-            _createNewBookDigest(address(this), author, "ipfs://cover", 1 ether, 90, 1, genre, 1, authorizationDeadline)
-        );
-        book = NalndaBook(
-            payable(marketplace.createNewBook(
-                    author, "ipfs://cover", 1 ether, 90, 1, genre, 1, authorizationDeadline, signature
-                ))
-        );
-    }
-
-    function testCreateBookSignatureCannotAuthorizeDifferentArguments() public {
-        uint256[] memory genre = new uint256[](1);
-        genre[0] = 1;
-        bytes memory signature = _sign(
-            _createNewBookDigest(
-                address(this), author, "ipfs://approved", 1 ether, 90, 1, genre, 2, authorizationDeadline
-            )
-        );
-
-        vm.expectRevert("NalndaMarketplace: Invalid signature!");
-        marketplace.createNewBook(author, "ipfs://changed", 1 ether, 90, 1, genre, 2, authorizationDeadline, signature);
-    }
-
-    function testCreateBookSignatureCannotAuthorizeBuyCover() public {
-        vm.prank(author);
-        book.ownerMint(author);
-        bytes memory listSignature = _sign(
-            _typedDataHash(
-                "NalndaMarketplace",
-                address(marketplace),
-                keccak256(abi.encode(LIST_COVER_TYPEHASH, author, address(book), 1, 1 ether, 30, authorizationDeadline))
-            )
-        );
-        vm.prank(author);
-        marketplace.listCover(book, 1, 1 ether, 30, authorizationDeadline, listSignature);
-
-        uint256[] memory genre = new uint256[](1);
-        genre[0] = 1;
-        bytes memory signature = _sign(
-            _createNewBookDigest(
-                address(this), author, "ipfs://approved", 1 ether, 90, 1, genre, 3, authorizationDeadline
-            )
-        );
-
-        vm.expectRevert("NalndaMarketplace: Invalid signature!");
-        marketplace.buyCover(1, 3, authorizationDeadline, signature);
+        book = NalndaBook(payable(marketplace.createNewBook(author, "ipfs://cover")));
     }
 
     function testMintSignatureCannotBeRedirected() public {
@@ -231,16 +179,128 @@ contract SignatureAuthorizationTest is Test {
 
     function testPauseBlocksNewMarketplaceTransactions() public {
         marketplace.pause();
-        uint256[] memory genre = new uint256[](1);
-        genre[0] = 1;
-        bytes memory signature = _sign(
-            _createNewBookDigest(
-                address(this), author, "ipfs://paused", 1 ether, 90, 1, genre, 12, authorizationDeadline
+
+        vm.expectRevert(NalndaMarketplace.MarketplacePaused.selector);
+        marketplace.createNewBook(author, "ipfs://paused");
+    }
+
+    function testAnyoneCanCreateBook() public {
+        address creator = makeAddr("creator");
+
+        vm.prank(creator);
+        address createdBook = marketplace.createNewBook(author, "ipfs://permissionless");
+
+        assertEq(Ownable(createdBook).owner(), author);
+        assertTrue(marketplace.createdBooks(createdBook));
+        assertEq(marketplace.authorToBooks(creator, 0), createdBook);
+    }
+
+    function testOnlyMarketplaceOwnerCanPauseBook() public {
+        address caller = makeAddr("caller");
+
+        vm.prank(caller);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, caller));
+        marketplace.pauseBook(address(book));
+    }
+
+    function testBookPauseBlocksMintAndTransfer() public {
+        vm.prank(author);
+        book.ownerMint(recipient);
+        marketplace.pauseBook(address(book));
+
+        vm.prank(author);
+        vm.expectRevert(NalndaBook.BookIsPaused.selector);
+        book.ownerMint(author);
+
+        vm.prank(recipient);
+        vm.expectRevert(NalndaBook.BookIsPaused.selector);
+        book.transferFrom(recipient, author, 1);
+    }
+
+    function testBookPauseBlocksListing() public {
+        vm.prank(author);
+        book.ownerMint(author);
+        marketplace.pauseBook(address(book));
+
+        vm.prank(author);
+        vm.expectRevert(NalndaBook.BookIsPaused.selector);
+        marketplace.listCover(book, 1, 1 ether, 12, authorizationDeadline, bytes(""));
+    }
+
+    function testBookPauseBlocksBuying() public {
+        vm.prank(author);
+        book.ownerMint(author);
+        bytes memory listSignature = _sign(
+            _typedDataHash(
+                "NalndaMarketplace",
+                address(marketplace),
+                keccak256(abi.encode(LIST_COVER_TYPEHASH, author, address(book), 1, 1 ether, 40, authorizationDeadline))
+            )
+        );
+        vm.prank(author);
+        marketplace.listCover(book, 1, 1 ether, 40, authorizationDeadline, listSignature);
+        marketplace.pauseBook(address(book));
+
+        vm.expectRevert(NalndaBook.BookIsPaused.selector);
+        marketplace.buyCover(1, 41, authorizationDeadline, bytes(""));
+    }
+
+    function testSellerCanUnlistPausedBook() public {
+        vm.prank(author);
+        book.ownerMint(author);
+        bytes memory listSignature = _sign(
+            _typedDataHash(
+                "NalndaMarketplace",
+                address(marketplace),
+                keccak256(abi.encode(LIST_COVER_TYPEHASH, author, address(book), 1, 1 ether, 42, authorizationDeadline))
+            )
+        );
+        vm.prank(author);
+        marketplace.listCover(book, 1, 1 ether, 42, authorizationDeadline, listSignature);
+        marketplace.pauseBook(address(book));
+        bytes memory unlistSignature = _sign(
+            _typedDataHash(
+                "NalndaMarketplace",
+                address(marketplace),
+                keccak256(abi.encode(UNLIST_COVER_TYPEHASH, author, 1, 43, authorizationDeadline))
             )
         );
 
-        vm.expectRevert(NalndaMarketplace.MarketplacePaused.selector);
-        marketplace.createNewBook(author, "ipfs://paused", 1 ether, 90, 1, genre, 12, authorizationDeadline, signature);
+        vm.prank(author);
+        marketplace.unlistCover(1, 43, authorizationDeadline, unlistSignature);
+
+        assertEq(book.ownerOf(1), author);
+    }
+
+    function testBookCanBeUnpaused() public {
+        marketplace.pauseBook(address(book));
+        marketplace.unpauseBook(address(book));
+
+        vm.prank(author);
+        book.ownerMint(author);
+
+        assertFalse(book.paused());
+        assertEq(book.ownerOf(1), author);
+    }
+
+    function testBooksCanBePausedAndUnpausedInBatch() public {
+        NalndaBook secondBook = NalndaBook(payable(marketplace.createNewBook(author, "ipfs://second")));
+        address[] memory books = new address[](2);
+        books[0] = address(book);
+        books[1] = address(secondBook);
+
+        marketplace.pauseBooks(books);
+        assertTrue(book.paused());
+        assertTrue(secondBook.paused());
+
+        marketplace.unpauseBooks(books);
+        assertFalse(book.paused());
+        assertFalse(secondBook.paused());
+    }
+
+    function testCannotPauseUnknownBook() public {
+        vm.expectRevert(NalndaMarketplace.UnknownBook.selector);
+        marketplace.pauseBook(makeAddr("unknownBook"));
     }
 
     function testSellerCanUnlistWhilePaused() public {
@@ -306,7 +366,7 @@ contract SignatureAuthorizationTest is Test {
         vm.expectRevert(NalndaMarketplace.InvalidSignerAddress.selector);
         new ERC1967Proxy(
             address(implementation),
-            abi.encodeCall(NalndaMarketplace.initialize, (address(this), address(this), address(0), address(forwarder)))
+            abi.encodeCall(NalndaMarketplace.initialize, (address(this), address(0), address(forwarder)))
         );
     }
 
@@ -315,22 +375,8 @@ contract SignatureAuthorizationTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableInvalidOwner.selector, address(0)));
         new ERC1967Proxy(
             address(implementation),
-            abi.encodeCall(NalndaMarketplace.initialize, (address(0), address(this), signer, address(forwarder)))
+            abi.encodeCall(NalndaMarketplace.initialize, (address(0), signer, address(forwarder)))
         );
-    }
-
-    function testConstructorRejectsZeroAuthorizedBookCreator() public {
-        NalndaMarketplace implementation = new NalndaMarketplace();
-        vm.expectRevert(NalndaMarketplace.InvalidAuthorizedBookCreator.selector);
-        new ERC1967Proxy(
-            address(implementation),
-            abi.encodeCall(NalndaMarketplace.initialize, (address(this), address(0), signer, address(forwarder)))
-        );
-    }
-
-    function testAuthorizedBookCreatorCannotBeSetToZeroAddress() public {
-        vm.expectRevert(NalndaMarketplace.InvalidAuthorizedBookCreator.selector);
-        marketplace.setAuthorizedBookCreator(address(0));
     }
 
     function testMarketplaceCanInitializeWithoutTrustedForwarder() public {
@@ -339,7 +385,7 @@ contract SignatureAuthorizationTest is Test {
             payable(address(
                     new ERC1967Proxy(
                         address(implementation),
-                        abi.encodeCall(NalndaMarketplace.initialize, (address(this), address(this), signer, address(0)))
+                        abi.encodeCall(NalndaMarketplace.initialize, (address(this), signer, address(0)))
                     )
                 ))
         );
@@ -353,9 +399,7 @@ contract SignatureAuthorizationTest is Test {
         vm.expectRevert(NalndaMarketplace.InvalidTrustedForwarder.selector);
         new ERC1967Proxy(
             address(implementation),
-            abi.encodeCall(
-                NalndaMarketplace.initialize, (address(this), address(this), signer, makeAddr("fakeForwarder"))
-            )
+            abi.encodeCall(NalndaMarketplace.initialize, (address(this), signer, makeAddr("fakeForwarder")))
         );
     }
 
@@ -436,12 +480,12 @@ contract SignatureAuthorizationTest is Test {
         NalndaMarketplace implementation = new NalndaMarketplace();
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        implementation.initialize(address(this), address(this), signer, address(forwarder));
+        implementation.initialize(address(this), signer, address(forwarder));
     }
 
     function testMarketplaceCannotBeInitializedTwice() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        marketplace.initialize(address(this), address(this), signer, address(forwarder));
+        marketplace.initialize(address(this), signer, address(forwarder));
     }
 
     function testOnlyMarketplaceOwnerCanUpgradeMarketplace() public {
@@ -513,34 +557,6 @@ contract SignatureAuthorizationTest is Test {
     function _signWithKey(uint256 privateKey, bytes32 digest) private pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return abi.encodePacked(r, s, v);
-    }
-
-    function _createNewBookDigest(
-        address caller,
-        address bookAuthor,
-        string memory coverUri,
-        uint256 initialPrice,
-        uint256 daysForSecondarySales,
-        uint256 lang,
-        uint256[] memory genre,
-        uint256 nonce,
-        uint48 deadline
-    ) private view returns (bytes32) {
-        bytes32 structHash = keccak256(
-            abi.encode(
-                CREATE_NEW_BOOK_TYPEHASH,
-                caller,
-                bookAuthor,
-                keccak256(bytes(coverUri)),
-                initialPrice,
-                daysForSecondarySales,
-                lang,
-                keccak256(abi.encode(genre)),
-                nonce,
-                deadline
-            )
-        );
-        return _typedDataHash("NalndaMarketplace", address(marketplace), structHash);
     }
 
     function _safeMintDigest(address caller, address to, uint256 nonce, uint48 deadline)
