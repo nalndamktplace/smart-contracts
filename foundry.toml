@@ -13,7 +13,9 @@ ignored_warnings_from = ["lib/"]
 [rpc_endpoints]
 amoy = "${POLYGON_AMOY_RPC}"
 base_sepolia = "${BASE_SEPOLIA_RPC}"
+base_mainnet = "${BASE_MAINNET_RPC}"
 
 [etherscan]
 amoy = { key = "${POLYGONSCAN_API_KEY}", url = "https://api-amoy.polygonscan.com/api" }
 base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+base_mainnet = { key = "${BASESCAN_API_KEY}" }

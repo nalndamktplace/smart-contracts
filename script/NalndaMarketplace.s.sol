@@ -15,8 +15,8 @@ contract DeployNalndaMarketplace is Script {
         uint256 deployerPrivateKey = vm.envUint("PVT_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address owner = 0xc478a3d380d841D89dF37fD21A1481deF863456a;
-        address signer = 0xc478a3d380d841D89dF37fD21A1481deF863456a;
+        address owner = 0xffE18f108fd4c8c921F6D8a86E8c612a227a1c3a;
+        address signer = 0x3345Ed6ECaDB3b5c064d3700EC250961f020aAc5;
         address trustedForwarder = address(0); // ERC-2771 disabled; ERC-4337 does not need a trusted forwarder.
 
         NalndaMarketplace implementation = new NalndaMarketplace();
