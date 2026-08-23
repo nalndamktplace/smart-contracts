@@ -1,6 +1,6 @@
 # Nalnda Smart Contracts
 
-### Latest addresses - Sepolia Mainnet
+### Base Mainnet Addresses
 
 ```text
 NalndaMarketplace implementation deployed at: 0x5122FE0B164509A3207410884EB2d720119EEe52
@@ -9,7 +9,7 @@ NalndaSCW implementation deployed at: 0x6EF56d8209eFBf58C785BeCA8eB47E4dE43E45Fc
 NalndaSCWFactory deployed at: 0x6090Ea184852Fdb5820eC9dCc56605D2467BE9d0
 ```
 
-### Latest addresses - Base Sepolia
+### Base Sepolia Addresses
 
 ```text
 NalndaMarketplace implementation deployed at: 0x9Ef594f8791202e9f0B6Fa575d1701CC9E9262aE
@@ -18,7 +18,7 @@ NalndaSCW implementation deployed at: 0x09358EF316C673b02EA34e0f1b0e38e8848A2731
 NalndaSCWFactory deployed at: 0x3eb3B6537b725a3Ec6F0aabc6EF5cfCE39eFd692
 ```
 
-#### Deploy the Nalnda contracts
+#### Deploy the Nalnda Smart Contracts
 
 ```shell
 forge script script/NalndaMarketplace.s.sol --fork-url [NETWORK_ALIAS] --broadcast
